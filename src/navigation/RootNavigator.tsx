@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
 import LoginScreen from "../screens/Auth/LoginScreen";
 import SignupScreen from "../screens/Auth/SignupScreen";
+import PriestDashboardScreen from "../screens/PriestDashboardScreen";
 import { MainTabs } from "./MainTabs";
 import { colors } from "../theme";
 
@@ -15,7 +16,7 @@ const navTheme = {
 };
 
 export function RootNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, isPriest, isAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -28,7 +29,7 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
       {user ? (
-        <MainTabs />
+        isPriest && !isAdmin ? <PriestDashboardScreen /> : <MainTabs />
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />

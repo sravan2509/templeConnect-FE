@@ -6,6 +6,7 @@ import { Button } from "../../components/Button";
 import { SectionHeader } from "../../components/SectionHeader";
 import { useAuth } from "../../context/AuthContext";
 import { colors, spacing } from "../../theme";
+import { getErrorMessage, API_BASE_URL } from "../../api/client";
 
 export default function LoginScreen({ navigation }: any) {
   const { signIn } = useAuth();
@@ -18,7 +19,15 @@ export default function LoginScreen({ navigation }: any) {
     try {
       await signIn(email, password);
     } catch (err: any) {
-      Alert.alert("Login failed", err?.response?.data?.error ?? "Please check your credentials");
+      const msg = getErrorMessage(err);
+      if (msg.toLowerCase().includes("cannot connect") || msg.toLowerCase().includes("network")) {
+        Alert.alert(
+          "Connection Error",
+          `${msg}\n\nAPI: ${API_BASE_URL}\n\n1. Start backend: cd templeConnect-BE && npm run dev\n2. Check your phone and PC are on same WiFi / connected via USB`,
+        );
+      } else {
+        Alert.alert("Login Failed", msg);
+      }
     } finally {
       setLoading(false);
     }

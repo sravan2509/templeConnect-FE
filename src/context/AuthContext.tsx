@@ -5,9 +5,15 @@ import { TOKEN_KEY } from "../api/client";
 
 const USER_KEY = "temple-connect-user";
 
+export interface AuthUserWithRole extends AuthUser {
+  role?: string;
+}
+
 interface AuthContextValue {
-  user: AuthUser | null;
+  user: AuthUserWithRole | null;
   loading: boolean;
+  isAdmin: boolean;
+  isPriest: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -16,8 +22,10 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUserWithRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const isAdmin = user?.role === "admin";
+  const isPriest = user?.role === "priest" || isAdmin;
 
   useEffect(() => {
     (async () => {
@@ -27,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  async function persist(token: string, authUser: AuthUser) {
+  async function persist(token: string, authUser: any) {
     await AsyncStorage.setItem(TOKEN_KEY, token);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(authUser));
     setUser(authUser);
@@ -37,6 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       loading,
+      isAdmin,
+      isPriest,
       signIn: async (email, password) => {
         const res = await loginApi(email, password);
         await persist(res.token, res.user);
@@ -50,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       },
     }),
-    [user, loading]
+    [user, loading, isAdmin, isPriest]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,51 +1,67 @@
 import { apiClient } from "./client";
 
-export interface Priest {
+export interface Puja {
   id: string;
   name: string;
-  specialization: string[];
-  languages: string[];
+  description?: string;
+  duration: string;
+  basePrice: number;
+  category: string;
+  icon: string;
+  active: boolean;
+}
+
+export interface PriestPuja {
+  puja: Puja;
+  price?: number;
+}
+
+export interface Priest {
+  id: string;
+  userId?: string;
+  name: string;
+  phone?: string;
+  specialization: string;
+  languages: string;
   rating: number;
   reviewCount: number;
   verified: boolean;
   experienceYears: number;
-  qualifications: string[];
+  qualifications: string;
   bio?: string;
   avatar?: string;
-  services?: PriestService[];
-}
-
-export interface PriestService {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  durationMins: number;
-}
-
-export interface PriestReview {
-  id: string;
-  rating: number;
-  comment?: string;
-  user?: { name: string };
-  createdAt: string;
+  priestPujas?: PriestPuja[];
 }
 
 export interface Booking {
   id: string;
   priestId: string;
-  serviceId: string;
+  pujaId: string;
   scheduledAt: string;
   status: string;
   paid: boolean;
   amount: number;
   notes?: string;
   priest?: { name: string };
-  service?: { name: string; price: number };
+  puja?: { name: string; icon: string };
 }
+
+// ── Pujas ─────────────────
+
+export async function listPujas(): Promise<Puja[]> {
+  const { data } = await apiClient.get("/admin/pujas");
+  return data;
+}
+
+// ── Priests ──────────────
 
 export async function listPriests(): Promise<Priest[]> {
   const { data } = await apiClient.get("/priests");
+  return data;
+}
+
+export async function getPriestsByPuja(pujaId: string): Promise<Priest[]> {
+  const { data } = await apiClient.get(`/priests/by-puja/${pujaId}`);
   return data;
 }
 
@@ -54,33 +70,20 @@ export async function getPriest(id: string): Promise<Priest> {
   return data;
 }
 
-export async function getPriestReviews(priestId: string): Promise<PriestReview[]> {
+export async function getPriestReviews(priestId: string): Promise<any[]> {
   const { data } = await apiClient.get(`/priests/${priestId}/reviews`);
   return data;
 }
 
-export async function getPriestServices(priestId: string): Promise<PriestService[]> {
-  const { data } = await apiClient.get(`/priests/${priestId}/services`);
-  return data;
-}
-
-export async function getPriestAvailability(priestId: string): Promise<any[]> {
-  const { data } = await apiClient.get(`/priests/${priestId}/availability`);
-  return data;
-}
+// ── Bookings ─────────────
 
 export async function listBookings(status?: string): Promise<Booking[]> {
   const { data } = await apiClient.get("/bookings", { params: status ? { status } : {} });
   return data;
 }
 
-export async function createBooking(
-  priestId: string,
-  serviceId: string,
-  scheduledAt: string,
-  notes?: string
-): Promise<Booking> {
-  const { data } = await apiClient.post("/bookings", { priestId, serviceId, scheduledAt, notes });
+export async function createBooking(priestId: string, pujaId: string, scheduledAt: string, notes?: string): Promise<Booking> {
+  const { data } = await apiClient.post("/bookings", { priestId, pujaId, scheduledAt, notes });
   return data;
 }
 
@@ -99,7 +102,19 @@ export async function cancelBooking(id: string): Promise<Booking> {
   return data;
 }
 
-export async function payForBooking(id: string): Promise<Booking> {
-  const { data } = await apiClient.post(`/bookings/${id}/pay`);
+// ── Priest Self-Service ──
+
+export async function getPriestProfile(): Promise<Priest> {
+  const { data } = await apiClient.get("/admin/priest/profile");
+  return data;
+}
+
+export async function updatePriestProfile(profileData: any): Promise<Priest> {
+  const { data } = await apiClient.patch("/admin/priest/profile", profileData);
+  return data;
+}
+
+export async function getPriestStats(): Promise<any> {
+  const { data } = await apiClient.get("/admin/priest/stats");
   return data;
 }

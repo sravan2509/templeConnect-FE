@@ -21,11 +21,8 @@ export default function BirthChartFormScreen({ navigation }: any) {
     setLoading(true);
     try {
       const chart = await submitBirthChart(dob, time, place);
-      navigation.navigate("Node", {
-        tabId: "rituals",
-        nodeId: "astrological-forecast",
-        chart,
-      });
+      Alert.alert("Profile Created!", `Nakshatra: ${chart.nakshatra}\nRashi: ${chart.rashi}\nDeity: ${chart.deityRecommendation?.primaryDeity}`);
+      navigation.navigate("BirthChartResult");
     } catch (err: any) {
       Alert.alert("Couldn't calculate chart", err?.response?.data?.error ?? "Please try again");
     } finally {
