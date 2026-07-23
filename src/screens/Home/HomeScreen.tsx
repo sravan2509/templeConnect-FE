@@ -52,9 +52,6 @@ export default function HomeScreen({ navigation }: any) {
           {isAdmin && <TouchableOpacity onPress={() => navigation.navigate("AdminDashboard")}>
             <Text style={styles.headerIcon}>⚙️</Text>
           </TouchableOpacity>}
-          <TouchableOpacity onPress={() => navigation.getParent()?.navigate("profile")}>
-            <Text style={styles.headerIcon}>👤</Text>
-          </TouchableOpacity>
         </View>
       </View>
 

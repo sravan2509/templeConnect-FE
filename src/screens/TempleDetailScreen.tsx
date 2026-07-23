@@ -43,8 +43,7 @@ export default function TempleDetailScreen({ route, navigation }: any) {
           </Text>
         </Card>
 
-        <Button title="Book a Puja at this Temple" onPress={() => navigation.getParent()?.navigate("connect")}
-          style={{ marginTop: spacing.md }} />
+
         <Button title="Find on Map" variant="secondary"
           onPress={() => navigation.navigate("Map", { lat: temple.location?.lat, lng: temple.location?.lon })}
           style={{ marginTop: spacing.sm }} />

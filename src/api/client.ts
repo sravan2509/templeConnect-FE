@@ -52,10 +52,16 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+export let forceLogout = () => {};
+export function setForceLogout(cb: () => void) { forceLogout = cb; }
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<{ error?: string; message?: string }>) => {
     if (error.response) {
+      if (error.response.status === 401) {
+        forceLogout();
+      }
       const msg = error.response.data?.error || error.response.data?.message || `Server error (${error.response.status})`;
       (error as any).friendlyMessage = msg;
     } else if (error.code === "ECONNABORTED") {
@@ -68,6 +74,7 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
 
 export function getErrorMessage(err: any): string {
   return err?.friendlyMessage || err?.response?.data?.error || err?.message || "Something went wrong";

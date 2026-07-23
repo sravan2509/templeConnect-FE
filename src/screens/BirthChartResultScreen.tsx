@@ -122,7 +122,7 @@ export default function BirthChartResultScreen({ route, navigation }: any) {
 
         <Button
           title="Find Nearby Temples"
-          onPress={() => navigation.getParent()?.navigate("temples")}
+          onPress={() => navigation.navigate("temples", { screen: "TempleSearch", params: { deity: deityRecommendation.primaryDeity } })}
           style={{ marginTop: spacing.md }}
         />
         <Button

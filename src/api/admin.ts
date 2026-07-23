@@ -143,3 +143,31 @@ export async function getMapTemples(params?: { lat?: number; lng?: number; deity
   const { data } = await apiClient.get("/admin/map-temples", { params });
   return data;
 }
+
+export interface KbArticle {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  category: string;
+  imageUrl: string | null;
+}
+
+export async function listKbArticles(): Promise<KbArticle[]> {
+  const { data } = await apiClient.get("/admin/kb");
+  return data;
+}
+
+export async function createKbArticle(articleData: Partial<KbArticle>): Promise<KbArticle> {
+  const { data } = await apiClient.post("/admin/kb", articleData);
+  return data;
+}
+
+export async function updateKbArticle(id: string, articleData: Partial<KbArticle>): Promise<KbArticle> {
+  const { data } = await apiClient.patch(`/admin/kb/${id}`, articleData);
+  return data;
+}
+
+export async function deleteKbArticle(id: string): Promise<void> {
+  await apiClient.delete(`/admin/kb/${id}`);
+}

@@ -63,6 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, loading, isAdmin, isPriest]
   );
 
+  useEffect(() => {
+    import("../api/client").then(({ setForceLogout }) => {
+      setForceLogout(() => {
+        value.signOut();
+      });
+    });
+  }, [value]);
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

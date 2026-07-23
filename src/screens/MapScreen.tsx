@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View, Platform } from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { ScrollView, StyleSheet, Text, View, Platform, Dimensions } from "react-native";
+import MapView, { Marker } from "react-native-maps";
 import { Screen } from "../components/Screen";
 import { Card } from "../components/Card";
 import { SectionHeader } from "../components/SectionHeader";
@@ -9,43 +10,62 @@ import { getMapTemples, MapTemple } from "../api/admin";
 export default function MapScreen({ route }: any) {
   const [temples, setTemples] = useState<MapTemple[]>([]);
   const [loading, setLoading] = useState(true);
+  const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     (async () => {
-      try { setTemples(await getMapTemples()); } catch {} finally { setLoading(false); }
+      try { 
+        const data = await getMapTemples();
+        setTemples(data);
+        if (data.length > 0 && mapRef.current) {
+          mapRef.current.fitToCoordinates(
+            data.map(t => ({ latitude: t.lat, longitude: t.lng })),
+            { edgePadding: { top: 50, right: 50, bottom: 50, left: 50 }, animated: true }
+          );
+        }
+      } catch {} finally { setLoading(false); }
     })();
   }, []);
 
+  // Use route params to center map if navigated from a specific temple
+  const initialRegion = {
+    latitude: route.params?.lat || 20.5937,
+    longitude: route.params?.lng || 78.9629,
+    latitudeDelta: route.params?.lat ? 0.05 : 15,
+    longitudeDelta: route.params?.lng ? 0.05 : 15,
+  };
+
   return (
-    <Screen>
-      <ScrollView>
-        <Card style={styles.mapPlaceholder}>
-          <Text style={styles.mapIcon}>🗺️</Text>
-          <Text style={styles.mapText}>Temple Locations</Text>
-          <Text style={styles.mapSub}>Interactive map requires react-native-maps. Showing coordinates below.</Text>
-        </Card>
-        <SectionHeader title={`${temples.length} Temples`} />
-        {loading ? <Text style={styles.loading}>Loading...</Text> :
-          temples.map((t) => (
-            <Card key={t.id}>
-              <Text style={styles.name}>🛕 {t.name}</Text>
-              <Text style={styles.sub}>{t.city}, {t.state}</Text>
-              <Text style={styles.coords}>📍 {t.lat.toFixed(4)}, {t.lng.toFixed(4)}</Text>
-            </Card>
-          ))
-        }
-      </ScrollView>
+    <Screen scroll={false}>
+      <View style={styles.container}>
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={initialRegion}
+          showsUserLocation={true}
+        >
+          {temples.map((t) => (
+            <Marker
+              key={t.id}
+              coordinate={{ latitude: t.lat, longitude: t.lng }}
+              title={t.name}
+              description={`${t.city}, ${t.state}`}
+            />
+          ))}
+        </MapView>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  mapPlaceholder: { height: 160, alignItems: "center", justifyContent: "center", backgroundColor: colors.peach },
-  mapIcon: { fontSize: 40, marginBottom: spacing.sm },
-  mapText: { color: colors.text, fontSize: 16, fontWeight: "700" },
-  mapSub: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs, textAlign: "center" },
-  loading: { color: colors.textMuted, textAlign: "center" },
-  name: { color: colors.text, fontSize: 15, fontWeight: "700" },
-  sub: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  coords: { color: colors.accent, fontSize: 12, marginTop: spacing.xs },
+  container: {
+    flex: 1,
+    borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  }
 });

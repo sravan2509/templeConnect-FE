@@ -6,15 +6,16 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { SectionHeader } from "../components/SectionHeader";
 import { colors, spacing, radius } from "../theme";
-import { getAdminDashboard, createPriest, updatePriest, deletePriest, AdminStats, listPujas, createPuja, deletePuja, Puja } from "../api/admin";
+import { getAdminDashboard, createPriest, updatePriest, deletePriest, AdminStats, listPujas, createPuja, deletePuja, Puja, listKbArticles, createKbArticle, deleteKbArticle, KbArticle } from "../api/admin";
 import { listPriests, Priest } from "../api/connect";
 
 export default function AdminDashboardScreen({ navigation }: any) {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"dashboard" | "pujas" | "priests">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "pujas" | "priests" | "kb">("dashboard");
   const [pujas, setPujas] = useState<Puja[]>([]);
   const [priests, setPriests] = useState<Priest[]>([]);
+  const [kbArticles, setKbArticles] = useState<KbArticle[]>([]);
 
   // Add puja form
   const [showAddPuja, setShowAddPuja] = useState(false);
@@ -37,11 +38,19 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const [pBio, setPBio] = useState("");
   const [selectedPujas, setSelectedPujas] = useState<string[]>([]);
 
+  // Add KB form
+  const [showAddKb, setShowAddKb] = useState(false);
+  const [kbTitle, setKbTitle] = useState("");
+  const [kbSummary, setKbSummary] = useState("");
+  const [kbContent, setKbContent] = useState("");
+  const [kbCategory, setKbCategory] = useState("general");
+
   useEffect(() => { loadAll(); }, []);
   async function loadAll() {
     try { setStats(await getAdminDashboard()); } catch {}
     try { setPujas(await listPujas()); } catch {}
     try { setPriests(await listPriests()); } catch {}
+    try { setKbArticles(await listKbArticles()); } catch {}
     setLoading(false);
   }
 
@@ -85,6 +94,23 @@ export default function AdminDashboardScreen({ navigation }: any) {
     ]);
   }
 
+  async function handleAddKb() {
+    if (!kbTitle.trim()) { Alert.alert("Error", "Title required"); return; }
+    try {
+      await createKbArticle({ title: kbTitle, summary: kbSummary, content: kbContent, category: kbCategory });
+      Alert.alert("Done", "Article added"); setShowAddKb(false);
+      setKbTitle(""); setKbSummary(""); setKbContent(""); setKbCategory("general");
+      loadAll();
+    } catch (e: any) { Alert.alert("Error", e?.friendlyMessage || "Failed"); }
+  }
+
+  async function handleDeleteKb(id: string, title: string) {
+    Alert.alert("Delete Article", `Delete "${title}"?`, [
+      { text: "Cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => { await deleteKbArticle(id); loadAll(); } },
+    ]);
+  }
+
   function togglePujaSelection(pujaId: string) {
     setSelectedPujas(prev => prev.includes(pujaId) ? prev.filter(id => id !== pujaId) : [...prev, pujaId]);
   }
@@ -94,9 +120,9 @@ export default function AdminDashboardScreen({ navigation }: any) {
   return (
     <Screen>
       <View style={styles.tabRow}>
-        {(["dashboard", "pujas", "priests"] as const).map(t => (
+        {(["dashboard", "pujas", "priests", "kb"] as const).map(t => (
           <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t === "dashboard" ? "📊 Stats" : t === "pujas" ? "🛕 Pujas" : "🧑‍🦱 Priests"}</Text>
+            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t === "dashboard" ? "📊 Stats" : t === "pujas" ? "🛕 Pujas" : t === "priests" ? "🧑‍🦱 Priests" : "📚 KB"}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -196,6 +222,36 @@ export default function AdminDashboardScreen({ navigation }: any) {
             ))}
           </>
         )}
+
+        {tab === "kb" && (
+          <>
+            <Button title="➕ Add Article" onPress={() => setShowAddKb(!showAddKb)}
+              variant={showAddKb ? "secondary" : "primary"} style={{ marginBottom: spacing.md }} />
+            {showAddKb && (
+              <Card style={{ marginBottom: spacing.md }}>
+                <TextField label="Title *" value={kbTitle} onChangeText={setKbTitle} placeholder="e.g. Temple Etiquette" />
+                <TextField label="Summary *" value={kbSummary} onChangeText={setKbSummary} placeholder="Brief summary" />
+                <TextField label="Content *" value={kbContent} onChangeText={setKbContent} placeholder="Full content of the article..." />
+                <TextField label="Category" value={kbCategory} onChangeText={setKbCategory} placeholder="general / kids / etiquette / cultural" />
+                <Button title="Save Article" onPress={handleAddKb} style={{ marginTop: spacing.sm }} />
+              </Card>
+            )}
+            {kbArticles.map(a => (
+              <Card key={a.id}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{a.title}</Text>
+                    <Text style={styles.sub}>{a.summary}</Text>
+                    <Text style={styles.sub}>Category: {a.category}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => handleDeleteKb(a.id, a.title)}>
+                    <Text style={{ color: colors.danger, fontSize: 20 }}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              </Card>
+            ))}
+          </>
+        )}
       </ScrollView>
     </Screen>
   );
@@ -214,7 +270,7 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: "row", marginBottom: spacing.md, backgroundColor: colors.cardAlt, borderRadius: radius.md, padding: 2 },
   tab: { flex: 1, paddingVertical: spacing.sm, alignItems: "center", borderRadius: radius.sm },
   tabActive: { backgroundColor: colors.primary },
-  tabText: { color: colors.textMuted, fontWeight: "600", fontSize: 13 },
+  tabText: { color: colors.textMuted, fontWeight: "600", fontSize: 12, textAlign: "center" },
   tabTextActive: { color: "#fff" },
   statsRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.md },
   cardTitle: { color: colors.text, fontSize: 15, fontWeight: "700" },
