@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal, FlatList } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -33,7 +34,7 @@ export default function BookPujaScreen({ navigation }: any) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
-  useEffect(() => { loadPujas(); loadBookings(); }, []);
+  useFocusEffect(useCallback(() => { loadPujas(); loadBookings(); }, []));
 
   async function loadPujas() { try { const p = await listPujas(); setPujas(p); setFilteredPujas(p); } catch {} }
   async function loadBookings() { try { setBookings(await listBookings()); } catch {} }

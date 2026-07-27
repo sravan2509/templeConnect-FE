@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -45,7 +46,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const [kbContent, setKbContent] = useState("");
   const [kbCategory, setKbCategory] = useState("general");
 
-  useEffect(() => { loadAll(); }, []);
+  useFocusEffect(useCallback(() => { loadAll(); }, []));
   async function loadAll() {
     try { setStats(await getAdminDashboard()); } catch {}
     try { setPujas(await listPujas()); } catch {}

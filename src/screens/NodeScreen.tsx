@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { ListRow } from "../components/ListRow";
 import { ToggleRow } from "../components/ToggleRow";
@@ -10,7 +11,7 @@ import { colors, spacing } from "../theme";
 import { findNode, TreeNode } from "../content/tree";
 import { useAuth } from "../context/AuthContext";
 import { getErrorMessage } from "../api/client";
-import { getFAQs, searchKnowledgeBase, getNotificationPrefs, getCheckins, getBookingHistory } from "../api/profile";
+import { getFAQs, searchKnowledgeBase, getNotificationPrefs, updateNotificationPrefs, getCheckins, getBookingHistory } from "../api/profile";
 import { listBookings } from "../api/connect";
 import { getForecast, getRecommendations } from "../api/astrology";
 import { getNotifications, markAllNotificationsRead } from "../api/admin";
@@ -23,7 +24,7 @@ export default function NodeScreen({ route, navigation }: any) {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
 
-  useEffect(() => { fetchNodeData(); }, [nodeId]);
+  useFocusEffect(useCallback(() => { fetchNodeData(); }, [nodeId]));
 
   async function fetchNodeData() {
     if (!node) return;
@@ -125,10 +126,18 @@ export default function NodeScreen({ route, navigation }: any) {
       });
     }
     if (typeof data === "object" && data?.pujaReminders !== undefined) {
+      const handleToggle = (key: string) => (val: boolean) => {
+        const updated = { ...data, [key]: val };
+        setData(updated);
+        updateNotificationPrefs({ [key]: val }).catch(() => {
+          // Revert on failure
+          setData(data);
+        });
+      };
       return <View>
-        <ToggleRow icon="🛕" label="Puja Reminders" value={data.pujaReminders} />
-        <ToggleRow icon="📅" label="Booking Updates" value={data.bookingUpdates} />
-        <ToggleRow icon="💫" label="Daily Suggestions" value={data.dailySuggestions} />
+        <ToggleRow icon="🛕" label="Puja Reminders" value={data.pujaReminders} onChange={handleToggle("pujaReminders")} />
+        <ToggleRow icon="📅" label="Booking Updates" value={data.bookingUpdates} onChange={handleToggle("bookingUpdates")} />
+        <ToggleRow icon="💫" label="Daily Suggestions" value={data.dailySuggestions} onChange={handleToggle("dailySuggestions")} />
       </View>;
     }
     return <Card><Text style={styles.detailText}>Content loaded.</Text></Card>;

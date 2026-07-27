@@ -41,7 +41,11 @@ export default function PriestChatScreen() {
     const fetchMsgs = async () => {
       try {
         const msgs = await getMessages(selectedUser.id);
-        if (isActive) setMessages(msgs);
+        if (isActive) {
+          // Replace entire list from server (source of truth) to avoid duplicates
+          // from the optimistic append in handleSend
+          setMessages(msgs);
+        }
       } catch {}
     };
     fetchMsgs();
@@ -55,7 +59,8 @@ export default function PriestChatScreen() {
     setText("");
     try {
       const msg = await sendMessage(selectedUser.id, currentText);
-      setMessages((prev) => [...prev, msg]);
+      // Optimistically append only if not already present (avoids duplicates with polling)
+      setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     } catch {}
   };

@@ -1,5 +1,9 @@
 import { apiClient } from "./client";
 
+// Re-export shared priest/puja functions from connect.ts to avoid duplicate definitions
+export { listPujas, getPriestProfile, updatePriestProfile, getPriestStats } from "./connect";
+export type { Puja } from "./connect";
+
 export interface Notification {
   id: string;
   title: string;
@@ -14,16 +18,6 @@ export interface AdminStats {
   recentBookings: any[];
 }
 
-export interface Puja {
-  id: string;
-  name: string;
-  description?: string;
-  duration: string;
-  basePrice: number;
-  category: string;
-  icon: string;
-  active: boolean;
-}
 
 export interface PriestStats {
   stats: { total: number; pending: number; confirmed: number; completed: number };
@@ -72,28 +66,13 @@ export async function deletePriest(id: string): Promise<void> {
   await apiClient.delete(`/admin/priests/${id}`);
 }
 
-export async function listPujas(): Promise<Puja[]> {
-  const { data } = await apiClient.get("/admin/pujas");
-  return data;
-}
-
-export async function createPuja(pujaData: Partial<Puja>): Promise<Puja> {
+export async function createPuja(pujaData: Partial<import("./connect").Puja>): Promise<import("./connect").Puja> {
   const { data } = await apiClient.post("/admin/pujas", pujaData);
   return data;
 }
 
 export async function deletePuja(id: string): Promise<void> {
   await apiClient.delete(`/admin/pujas/${id}`);
-}
-
-export async function getPriestProfile(): Promise<any> {
-  const { data } = await apiClient.get("/admin/priest/profile");
-  return data;
-}
-
-export async function updatePriestProfile(profileData: any): Promise<any> {
-  const { data } = await apiClient.patch("/admin/priest/profile", profileData);
-  return data;
 }
 
 export async function acceptBooking(id: string): Promise<any> {
@@ -106,10 +85,6 @@ export async function rejectBooking(id: string): Promise<any> {
   return data;
 }
 
-export async function getPriestStats(): Promise<PriestStats> {
-  const { data } = await apiClient.get("/admin/priest/stats");
-  return data;
-}
 
 export async function getNotifications(): Promise<Notification[]> {
   const { data } = await apiClient.get("/admin/notifications");

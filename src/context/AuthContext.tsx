@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AuthUser, login as loginApi, register as registerApi } from "../api/auth";
-import { TOKEN_KEY } from "../api/client";
+import { TOKEN_KEY, setForceLogout } from "../api/client";
 
 const USER_KEY = "temple-connect-user";
 
@@ -41,6 +41,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(authUser);
   }
 
+  // Use a ref so forceLogout always calls the latest signOut without re-registering
+  const signOutRef = useRef<() => Promise<void>>(async () => {
+    await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+    setUser(null);
+  });
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -56,20 +62,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await persist(res.token, res.user);
       },
       signOut: async () => {
-        await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
-        setUser(null);
+        await signOutRef.current();
       },
     }),
     [user, loading, isAdmin, isPriest]
   );
 
+  // Register forceLogout once — the ref ensures it always uses the latest signOut
   useEffect(() => {
-    import("../api/client").then(({ setForceLogout }) => {
-      setForceLogout(() => {
-        value.signOut();
-      });
+    setForceLogout(() => {
+      signOutRef.current();
     });
-  }, [value]);
+  }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
