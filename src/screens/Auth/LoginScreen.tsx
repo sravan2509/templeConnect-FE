@@ -34,12 +34,18 @@ export default function LoginScreen({ navigation }: any) {
   }
 
   return (
-    <Screen>
+    <Screen safeTop>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginBottom: spacing.md }}>
+        <Text style={{ color: colors.primary, fontWeight: "600" }}>⬅ Back</Text>
+      </TouchableOpacity>
       <SectionHeader title="Temple Connect" />
       <Text style={styles.subtitle}>Sign in to continue</Text>
       <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" />
       <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="••••••••" />
       <Button title="Log In" onPress={handleLogin} loading={loading} style={{ marginTop: spacing.sm }} />
+      <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")} style={styles.link}>
+        <Text style={styles.linkText}>Forgot Password?</Text>
+      </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate("Signup")} style={styles.link}>
         <Text style={styles.linkText}>Don't have an account? Sign up</Text>
       </TouchableOpacity>

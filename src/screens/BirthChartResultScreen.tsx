@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -24,26 +25,35 @@ export default function BirthChartResultScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await getAstroProfile();
-        setProfile(data);
-      } catch (err: any) {
-        if (err?.response?.status === 404) {
-          setError("No birth chart found. Please add your birth details first.");
-        } else {
-          setError(err?.response?.data?.error ?? "Failed to load profile.");
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      (async () => {
+        try {
+          const data = await getAstroProfile();
+          if (isActive) {
+            setProfile(data);
+            setError(null);
+          }
+        } catch (err: any) {
+          if (isActive) {
+            if (err?.response?.status === 404) {
+              setError("No birth chart found. Please add your birth details first.");
+            } else {
+              setError(err?.response?.data?.error ?? "Failed to load profile.");
+            }
+          }
+        } finally {
+          if (isActive) setLoading(false);
         }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+      })();
+      return () => { isActive = false; };
+    }, [])
+  );
 
   if (loading) {
     return (
-      <Screen>
+      <Screen scroll={false}>
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
       </Screen>
     );
@@ -51,7 +61,7 @@ export default function BirthChartResultScreen({ route, navigation }: any) {
 
   if (error || !profile) {
     return (
-      <Screen>
+      <Screen scroll={false}>
         <SectionHeader title="Your Spiritual Profile" />
         <Text style={styles.empty}>{error || "No data available."}</Text>
         <Button
@@ -66,7 +76,7 @@ export default function BirthChartResultScreen({ route, navigation }: any) {
   const { rashi, nakshatra, moonLongitude, deityRecommendation, birthDetails } = profile;
 
   return (
-    <Screen>
+    <Screen scroll={false}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.xl }}>
         <SectionHeader title="Your Spiritual Profile" />
 

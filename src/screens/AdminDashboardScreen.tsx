@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, FlatList } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -115,10 +115,10 @@ export default function AdminDashboardScreen({ navigation }: any) {
     setSelectedPujas(prev => prev.includes(pujaId) ? prev.filter(id => id !== pujaId) : [...prev, pujaId]);
   }
 
-  if (loading) return <Screen><Text style={styles.loading}>Loading...</Text></Screen>;
+  if (loading) return <Screen scroll={false}><Text style={styles.loading}>Loading...</Text></Screen>;
 
   return (
-    <Screen>
+    <Screen scroll={false}>
       <View style={styles.tabRow}>
         {(["dashboard", "pujas", "priests", "kb"] as const).map(t => (
           <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>

@@ -10,11 +10,11 @@ export default function TempleDetailScreen({ route, navigation }: any) {
   const temple: TempleResult = route.params?.temple;
 
   if (!temple) {
-    return <Screen><Text style={styles.empty}>No temple selected.</Text></Screen>;
+    return <Screen scroll={false}><Text style={styles.empty}>No temple selected.</Text></Screen>;
   }
 
   return (
-    <Screen>
+    <Screen scroll={false}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <SectionHeader title={temple.name} />
         <Card style={styles.hero}>

@@ -171,3 +171,18 @@ export async function updateKbArticle(id: string, articleData: Partial<KbArticle
 export async function deleteKbArticle(id: string): Promise<void> {
   await apiClient.delete(`/admin/kb/${id}`);
 }
+
+export async function getChatUsers(): Promise<any[]> {
+  const { data } = await apiClient.get("/chat-users");
+  return data;
+}
+
+export async function getMessages(userId: string): Promise<any[]> {
+  const { data } = await apiClient.get(`/chat/${userId}`);
+  return data;
+}
+
+export async function sendMessage(userId: string, text: string): Promise<any> {
+  const { data } = await apiClient.post(`/chat/${userId}`, { text });
+  return data;
+}

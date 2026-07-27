@@ -13,7 +13,7 @@ import { getErrorMessage } from "../api/client";
 import { getFAQs, searchKnowledgeBase, getNotificationPrefs, getCheckins, getBookingHistory } from "../api/profile";
 import { listBookings } from "../api/connect";
 import { getForecast, getRecommendations } from "../api/astrology";
-import { getNotifications } from "../api/admin";
+import { getNotifications, markAllNotificationsRead } from "../api/admin";
 
 export default function NodeScreen({ route, navigation }: any) {
   const { tabId, nodeId } = route.params as { tabId: string; nodeId: string };
@@ -40,7 +40,14 @@ export default function NodeScreen({ route, navigation }: any) {
         case "booking-history": { setData(await getBookingHistory()); break; }
         case "notification-preferences": { setData(await getNotificationPrefs()); break; }
         case "help-center": { setData(await getFAQs()); break; }
-        case "notifications": { setData(await getNotifications()); break; }
+        case "notifications": { 
+          const notifs = await getNotifications();
+          setData(notifs); 
+          if (notifs.some((n: any) => !n.read)) {
+            markAllNotificationsRead().catch(console.error);
+          }
+          break; 
+        }
         default: setData(null);
       }
     } catch (e: any) { setError(getErrorMessage(e)); }
@@ -72,7 +79,12 @@ export default function NodeScreen({ route, navigation }: any) {
       {hasRows && renderRows()}
       {!isHub && !hasRows && !loading && data !== null && renderContent()}
 
-      {node.id === "profile-root" && <Button title="Log Out" variant="secondary" onPress={signOut} style={{ marginTop: spacing.lg }} />}
+      {node.id === "profile-root" && (
+        <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+          <Button title="Change Password" variant="secondary" onPress={() => navigation.navigate("ChangePassword")} />
+          <Button title="Log Out" variant="secondary" onPress={signOut} />
+        </View>
+      )}
     </Screen>
   );
 
@@ -90,7 +102,7 @@ export default function NodeScreen({ route, navigation }: any) {
 
   function renderRows() {
     return node!.rows!.map(row => row.toggle
-      ? <ToggleRow key={row.label} icon={row.icon} label={row.label} defaultOn={row.defaultOn} />
+      ? <ToggleRow key={row.label} icon={row.icon} label={row.label} value={row.defaultOn} />
       : <ListRow key={row.label} icon={row.icon} title={row.label} subtitle={row.value} chevron={!row.value} />
     );
   }
@@ -99,8 +111,6 @@ export default function NodeScreen({ route, navigation }: any) {
     if (Array.isArray(data)) {
       if (data.length === 0) return <Card><Text style={styles.detailText}>No items found.</Text></Card>;
       return data.map((item: any, i: number) => {
-        if (item.title) return <Card key={i}><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.detailText}>{item.summary || item.answer || item.content}</Text></Card>;
-        if (item.question) return <Card key={i}><Text style={styles.cardTitle}>{item.question}</Text><Text style={styles.detailText}>{item.answer}</Text></Card>;
         if (item.type && item.body) return (
           <Card key={i} style={item.read ? {} : { borderColor: colors.primary, borderWidth: 2 }}>
             <Text style={styles.cardTitle}>{item.read ? "" : "🔵 "}{item.title}</Text>
@@ -108,15 +118,17 @@ export default function NodeScreen({ route, navigation }: any) {
             <Text style={styles.sub}>{new Date(item.createdAt).toLocaleString()} · {item.type}</Text>
           </Card>
         );
+        if (item.title) return <Card key={i}><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.detailText}>{item.summary || item.answer || item.content}</Text></Card>;
+        if (item.question) return <Card key={i}><Text style={styles.cardTitle}>{item.question}</Text><Text style={styles.detailText}>{item.answer}</Text></Card>;
         if (item.puja?.name) return <Card key={i}><Text style={styles.cardTitle}>{item.puja.icon} {item.puja.name}</Text><Text style={styles.sub}>Priest: {item.priest?.name} · {new Date(item.scheduledAt).toLocaleDateString()}</Text><Text style={[styles.status, item.status === "confirmed" && {color: colors.success}]}>{item.status.toUpperCase()}</Text></Card>;
         return null;
       });
     }
     if (typeof data === "object" && data?.pujaReminders !== undefined) {
       return <View>
-        <ToggleRow icon="🛕" label="Puja Reminders" defaultOn={data.pujaReminders} />
-        <ToggleRow icon="📅" label="Booking Updates" defaultOn={data.bookingUpdates} />
-        <ToggleRow icon="💫" label="Daily Suggestions" defaultOn={data.dailySuggestions} />
+        <ToggleRow icon="🛕" label="Puja Reminders" value={data.pujaReminders} />
+        <ToggleRow icon="📅" label="Booking Updates" value={data.bookingUpdates} />
+        <ToggleRow icon="💫" label="Daily Suggestions" value={data.dailySuggestions} />
       </View>;
     }
     return <Card><Text style={styles.detailText}>Content loaded.</Text></Card>;

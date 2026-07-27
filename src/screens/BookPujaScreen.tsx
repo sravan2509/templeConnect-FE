@@ -111,10 +111,10 @@ export default function BookPujaScreen({ navigation }: any) {
     );
   }
 
-  if (loading) return <Screen><Text style={styles.loading}>Loading...</Text></Screen>;
+  if (loading) return <Screen scroll={false}><Text style={styles.loading}>Loading...</Text></Screen>;
 
   return (
-    <Screen>
+    <Screen scroll={false}>
       <View style={styles.stepRow}>
         {(["pujas", "priests", "book", "bookings"] as Step[]).map(s => (
           <TouchableOpacity key={s} onPress={() => { if (s === "pujas" || s === "bookings") setStep(s); }}>

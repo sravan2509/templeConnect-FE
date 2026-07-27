@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { colors, spacing, radius } from "../../theme";
 import { SearchBar } from "../../components/SearchBar";
 import { PromoCard } from "../../components/PromoCard";
@@ -9,7 +10,7 @@ import { Button } from "../../components/Button";
 import { SectionHeader } from "../../components/SectionHeader";
 import { useAuth } from "../../context/AuthContext";
 import { getAstroProfile, AstroProfile } from "../../api/astrology";
-import { getDailySuggestion, DailySuggestion } from "../../api/admin";
+import { getDailySuggestion, DailySuggestion, getUnreadCount } from "../../api/admin";
 import { getTemplesNearby, TempleResult } from "../../api/temples";
 
 export default function HomeScreen({ navigation }: any) {
@@ -18,14 +19,29 @@ export default function HomeScreen({ navigation }: any) {
   const [suggestion, setSuggestion] = useState<DailySuggestion | null>(null);
   const [temples, setTemples] = useState<TempleResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      try { setProfile(await getAstroProfile()); } catch {}
-      try { setSuggestion(await getDailySuggestion()); } catch {}
-      setLoading(false);
-    })();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      (async () => {
+        try { 
+          const prof = await getAstroProfile();
+          if (isActive) setProfile(prof);
+        } catch {}
+        try { 
+          const sug = await getDailySuggestion();
+          if (isActive) setSuggestion(sug);
+        } catch {}
+        try {
+          const res = await getUnreadCount();
+          if (isActive) setUnreadCount(res.count);
+        } catch {}
+        if (isActive) setLoading(false);
+      })();
+      return () => { isActive = false; };
+    }, [])
+  );
 
   useEffect(() => {
     if (!profile) return;
@@ -47,7 +63,14 @@ export default function HomeScreen({ navigation }: any) {
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => navigation.push("Node", { tabId: "home", nodeId: "notifications" })}>
-            <Text style={styles.headerIcon}>🔔</Text>
+            <View>
+              <Text style={styles.headerIcon}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
           {isAdmin && <TouchableOpacity onPress={() => navigation.navigate("AdminDashboard")}>
             <Text style={styles.headerIcon}>⚙️</Text>
@@ -120,6 +143,8 @@ const styles = StyleSheet.create({
   headerTitle: { color: colors.primary, fontSize: 20, fontWeight: "800" },
   headerRight: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   headerIcon: { fontSize: 20, marginLeft: spacing.md },
+  badge: { position: "absolute", top: -4, right: -4, backgroundColor: colors.primary, borderRadius: 10, width: 18, height: 18, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: colors.card },
+  badgeText: { color: colors.card, fontSize: 10, fontWeight: "700" },
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   greeting: { color: colors.text, fontSize: 20, fontWeight: "700", marginBottom: spacing.md },
   loading: { color: colors.textMuted, textAlign: "center", marginVertical: spacing.lg },

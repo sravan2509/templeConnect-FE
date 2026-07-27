@@ -35,7 +35,10 @@ export default function SignupScreen({ navigation }: any) {
   }
 
   return (
-    <Screen>
+    <Screen safeTop>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginBottom: spacing.md }}>
+        <Text style={{ color: colors.primary, fontWeight: "600" }}>? Back</Text>
+      </TouchableOpacity>
       <SectionHeader title="Create Account" />
       <Text style={styles.subtitle}>Join Temple Connect</Text>
       <TextField label="Name" value={name} onChangeText={setName} placeholder="Your name" />

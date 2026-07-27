@@ -4,7 +4,10 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
 import LoginScreen from "../screens/Auth/LoginScreen";
 import SignupScreen from "../screens/Auth/SignupScreen";
-import PriestDashboardScreen from "../screens/PriestDashboardScreen";
+import ForgotPasswordScreen from "../screens/Auth/ForgotPasswordScreen";
+import ResetPasswordScreen from "../screens/Auth/ResetPasswordScreen";
+import LandingScreen from "../screens/Auth/LandingScreen";
+import { PriestTabs } from "./PriestTabs";
 import { MainTabs } from "./MainTabs";
 import { colors } from "../theme";
 
@@ -29,11 +32,14 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
       {user ? (
-        isPriest && !isAdmin ? <PriestDashboardScreen /> : <MainTabs />
+        isPriest && !isAdmin ? <PriestTabs /> : <MainTabs />
       ) : (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Landing">
+          <Stack.Screen name="Landing" component={LandingScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         </Stack.Navigator>
       )}
     </NavigationContainer>
