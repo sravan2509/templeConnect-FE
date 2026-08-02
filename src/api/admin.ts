@@ -71,6 +71,11 @@ export async function createPuja(pujaData: Partial<import("./connect").Puja>): P
   return data;
 }
 
+export async function updatePuja(id: string, pujaData: Partial<import("./connect").Puja>): Promise<import("./connect").Puja> {
+  const { data } = await apiClient.patch(`/admin/pujas/${id}`, pujaData);
+  return data;
+}
+
 export async function deletePuja(id: string): Promise<void> {
   await apiClient.delete(`/admin/pujas/${id}`);
 }
@@ -128,25 +133,6 @@ export interface KbArticle {
   imageUrl: string | null;
 }
 
-export async function listKbArticles(): Promise<KbArticle[]> {
-  const { data } = await apiClient.get("/admin/kb");
-  return data;
-}
-
-export async function createKbArticle(articleData: Partial<KbArticle>): Promise<KbArticle> {
-  const { data } = await apiClient.post("/admin/kb", articleData);
-  return data;
-}
-
-export async function updateKbArticle(id: string, articleData: Partial<KbArticle>): Promise<KbArticle> {
-  const { data } = await apiClient.patch(`/admin/kb/${id}`, articleData);
-  return data;
-}
-
-export async function deleteKbArticle(id: string): Promise<void> {
-  await apiClient.delete(`/admin/kb/${id}`);
-}
-
 export async function getChatUsers(): Promise<any[]> {
   const { data } = await apiClient.get("/chat-users");
   return data;
@@ -161,3 +147,145 @@ export async function sendMessage(userId: string, text: string): Promise<any> {
   const { data } = await apiClient.post(`/chat/${userId}`, { text });
   return data;
 }
+
+// ── Temple Events & Pujas Management ────────────────────────
+
+export interface TempleEventInput {
+  name: string;
+  description?: string;
+  date: string;
+  time?: string;
+}
+
+export interface TemplePujaInput {
+  name: string;
+  description?: string;
+  schedule?: string;
+  time?: string;
+}
+
+export interface SaveTempleEventsInput {
+  templeName: string;
+  placeId: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  lat?: number;
+  lon?: number;
+  events: TempleEventInput[];
+  pujas: TemplePujaInput[];
+}
+
+export interface AdminTemple {
+  id: string;
+  name: string;
+  placeId: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  lat: number | null;
+  lon: number | null;
+  createdAt: string;
+  updatedAt: string;
+  events: Array<{
+    id: string;
+    templeId: string;
+    name: string;
+    description: string | null;
+    date: string;
+    time: string | null;
+    createdAt: string;
+  }>;
+  templePujas: Array<{
+    id: string;
+    templeId: string;
+    name: string;
+    description: string | null;
+    schedule: string | null;
+    time: string | null;
+    createdAt: string;
+  }>;
+}
+
+export async function saveTempleEventsAndPujas(input: SaveTempleEventsInput): Promise<AdminTemple> {
+  const { data } = await apiClient.post("/admin/temple-events", input);
+  return data;
+}
+
+export async function getAdminTemples(): Promise<AdminTemple[]> {
+  const { data } = await apiClient.get("/admin/temple-events");
+  return data;
+}
+
+export async function deleteTempleEvent(templeId: string, eventId: string): Promise<void> {
+  await apiClient.delete(`/admin/temple-events/${templeId}/events/${eventId}`);
+}
+
+export async function deleteTemplePuja(templeId: string, pujaId: string): Promise<void> {
+  await apiClient.delete(`/admin/temple-events/${templeId}/pujas/${pujaId}`);
+}
+
+export async function deleteAdminTemple(templeId: string): Promise<void> {
+  await apiClient.delete(`/admin/temple-events/${templeId}`);
+}
+
+export async function submitReview(priestId: string, rating: number, comment?: string): Promise<any> {
+  const { data } = await apiClient.post(`/priests/${priestId}/reviews`, { rating, comment });
+  return data;
+}
+
+// KB Articles
+export async function listKbArticles(): Promise<any[]> {
+  const { data } = await apiClient.get("/admin/kb");
+  return data;
+}
+
+export async function createKbArticle(article: any): Promise<any> {
+  const { data } = await apiClient.post("/admin/kb", article);
+  return data;
+}
+
+export async function updateKbArticle(id: string, article: any): Promise<any> {
+  const { data } = await apiClient.patch(`/admin/kb/${id}`, article);
+  return data;
+}
+
+export async function deleteKbArticle(id: string): Promise<void> {
+  await apiClient.delete(`/admin/kb/${id}`);
+}
+
+// FAQs
+export async function createFaq(faq: any): Promise<any> {
+  const { data } = await apiClient.post("/admin/faqs", faq);
+  return data;
+}
+
+export async function updateFaq(id: string, faq: any): Promise<any> {
+  const { data } = await apiClient.patch(`/admin/faqs/${id}`, faq);
+  return data;
+}
+
+export async function deleteFaq(id: string): Promise<void> {
+  await apiClient.delete(`/admin/faqs/${id}`);
+}
+
+// Daily Suggestions
+export async function listSuggestions(): Promise<any[]> {
+  const { data } = await apiClient.get("/admin/suggestions");
+  return data;
+}
+
+export async function createSuggestion(sug: any): Promise<any> {
+  const { data } = await apiClient.post("/admin/suggestions", sug);
+  return data;
+}
+
+export async function updateSuggestion(id: string, sug: any): Promise<any> {
+  const { data } = await apiClient.patch(`/admin/suggestions/${id}`, sug);
+  return data;
+}
+
+export async function deleteSuggestion(id: string): Promise<void> {
+  await apiClient.delete(`/admin/suggestions/${id}`);
+}
+

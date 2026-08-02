@@ -1,54 +1,39 @@
-import { useState, useCallback, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
 import { colors, spacing, radius } from "../../theme";
 import { SearchBar } from "../../components/SearchBar";
+import { QuickAccessItem } from "../../components/QuickAccessItem";
 import { PromoCard } from "../../components/PromoCard";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { SectionHeader } from "../../components/SectionHeader";
 import { useAuth } from "../../context/AuthContext";
-import { getAstroProfile, AstroProfile } from "../../api/astrology";
-import { getDailySuggestion, DailySuggestion, getUnreadCount } from "../../api/admin";
-import { getTemplesNearby, TempleResult } from "../../api/temples";
+import { getAstroProfile } from "../../api/astrology";
+import { getDailySuggestion, getUnreadCount } from "../../api/admin";
+import { getTemplesNearby } from "../../api/temples";
 
 export default function HomeScreen({ navigation }: any) {
   const { user, isAdmin } = useAuth();
-  const [profile, setProfile] = useState<AstroProfile | null>(null);
-  const [suggestion, setSuggestion] = useState<DailySuggestion | null>(null);
-  const [temples, setTemples] = useState<TempleResult[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [profile, setProfile] = useState<any>(null);
+  const [suggestion, setSuggestion] = useState<any>(null);
+  const [temples, setTemples] = useState<any[]>([]);
+  const [unread, setUnread] = useState(0);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      (async () => {
-        try { 
-          const prof = await getAstroProfile();
-          if (isActive) setProfile(prof);
-        } catch {}
-        try { 
-          const sug = await getDailySuggestion();
-          if (isActive) setSuggestion(sug);
-        } catch {}
-        try {
-          const res = await getUnreadCount();
-          if (isActive) setUnreadCount(res.count);
-        } catch {}
-        if (isActive) setLoading(false);
-      })();
-      return () => { isActive = false; };
-    }, [])
-  );
+  useEffect(() => {
+    (async () => {
+      try { setProfile(await getAstroProfile()); } catch {}
+      try { setSuggestion(await getDailySuggestion()); } catch {}
+      try { const c = await getUnreadCount(); setUnread(c.count); } catch {}
+    })();
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
     (async () => {
       try {
         const deity = profile.deityRecommendation.primaryDeity;
-        const nearby = await getTemplesNearby(profile.birthDetails.lat, profile.birthDetails.lng, deity, 500);
+        const nearby = await getTemplesNearby(profile.birthDetails.lat, profile.birthDetails.lng, deity, 200);
         setTemples(nearby.data || []);
       } catch {}
     })();
@@ -63,73 +48,39 @@ export default function HomeScreen({ navigation }: any) {
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => navigation.push("Node", { tabId: "home", nodeId: "notifications" })}>
-            <View>
-              <Text style={styles.headerIcon}>🔔</Text>
-              {unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                </View>
-              )}
-            </View>
+            <Text style={styles.headerIcon}>🔔{unread > 0 ? <Text style={{ color: colors.danger, fontSize: 10 }}> {unread}</Text> : null}</Text>
           </TouchableOpacity>
-          {isAdmin && <TouchableOpacity onPress={() => navigation.navigate("AdminDashboard")}>
-            <Text style={styles.headerIcon}>⚙️</Text>
-          </TouchableOpacity>}
+          {isAdmin && <TouchableOpacity onPress={() => navigation.navigate("AdminDashboard")}><Text style={styles.headerIcon}>⚙️</Text></TouchableOpacity>}
+          <TouchableOpacity onPress={() => navigation.getParent()?.navigate("profile")}><Text style={styles.headerIcon}>👤</Text></TouchableOpacity>
         </View>
       </View>
-
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
         <Text style={styles.greeting}>Namaste{user ? `, ${user.name}` : ""} 🙏</Text>
 
-        {loading ? <Text style={styles.loading}>Loading your spiritual profile...</Text> : profile ? (
+        {profile ? (
           <>
-            <Card style={styles.profileCardBox}>
-              <Text style={styles.sectionTitle}>🌙 Your Nakshatra: {profile.nakshatra.name} (Pada {profile.nakshatra.pada})</Text>
-              <Text style={styles.sub}>Rashi: {profile.rashi.name} ({profile.rashi.englishName}) · {profile.rashi.element} · {profile.rashi.quality}</Text>
-              <Text style={styles.sub}>Ruled by {profile.nakshatra.rulingPlanet} (Nak) / {profile.rashi.rulingPlanet} (Rashi)</Text>
+            <Card style={styles.profileBox}>
+              <Text style={styles.sectionTitle}>🌙 {profile.nakshatra.name} (Pada {profile.nakshatra.pada}) · {profile.rashi.name} ({profile.rashi.englishName})</Text>
+              <Text style={styles.sub}>{profile.rashi.element} · {profile.rashi.quality} · Ruled by {profile.nakshatra.rulingPlanet}/{profile.rashi.rulingPlanet}</Text>
             </Card>
-
-            <PromoCard title={`🛕 Lord ${profile.deityRecommendation.primaryDeity}`}
-              subtitle={`Your recommended deity for temple worship based on ${profile.nakshatra.name} Nakshatra.`}
-              onPress={() => navigation.navigate("TempleSearch")} />
-
-            {suggestion && (
-              <Card style={styles.sugCard}>
-                <Text style={styles.sugTitle}>💫 {suggestion.title}</Text>
-                <Text style={styles.sugBody}>{suggestion.body}</Text>
-              </Card>
-            )}
-
-            {temples.length > 0 && (
-              <>
-                <SectionHeader title={`${profile.deityRecommendation.primaryDeity} Temples Near You`} />
-                {temples.map((t, i) => (
-                  <TouchableOpacity key={i} onPress={() => navigation.navigate("TempleDetail", { temple: t })}>
-                    <Card>
-                      <Text style={styles.templeName}>🛕 {t.name}</Text>
-                      <Text style={styles.sub}>{t.city}, {t.state} {t.distanceKm ? `· ${t.distanceKm.toFixed(0)} km` : ""}</Text>
-                    </Card>
-                  </TouchableOpacity>
-                ))}
-              </>
-            )}
+            <PromoCard title={`🛕 Lord ${profile.deityRecommendation.primaryDeity}`} subtitle="Your recommended deity based on your birth star." onPress={() => navigation.navigate("TempleSearch")} />
+            {suggestion && <Card style={styles.sugCard}><Text style={styles.sugTitle}>💫 {suggestion.title}</Text><Text style={styles.sugBody}>{suggestion.body}</Text></Card>}
+            {temples.length > 0 && <><SectionHeader title={`${profile.deityRecommendation.primaryDeity} Temples Near You`} />{temples.slice(0, 4).map((t: any, i: number) => <TouchableOpacity key={t.placeId || i} onPress={() => navigation.navigate("TempleDetail", { temple: t })}><Card><Text style={styles.tName}>🛕 {t.name}</Text><Text style={styles.sub}>{t.city}, {t.state}{t.distanceKm ? ` · ${t.distanceKm.toFixed(0)}km` : ""}</Text></Card></TouchableOpacity>)}</>}
           </>
         ) : (
-          <Card>
-            <Text style={styles.emptyTitle}>Set Up Your Spiritual Profile</Text>
-            <Text style={styles.sub}>Enter your birth details to discover your Nakshatra, Rashi, and personalized deity recommendations.</Text>
-            <Button title="Enter Birth Details" onPress={() => navigation.navigate("BirthChartForm")} style={{ marginTop: spacing.md }} />
-          </Card>
+          <Card><Text style={styles.emptyTitle}>Set Up Your Spiritual Profile</Text><Text style={styles.sub}>Enter your birth details to discover your Nakshatra, Rashi, and deity.</Text><Button title="Enter Birth Details" onPress={() => navigation.navigate("BirthChartForm")} style={{ marginTop: spacing.md }} /></Card>
         )}
 
-        <Button title={profile ? "Edit Birth Details" : "Enter Birth Details"}
-          onPress={() => navigation.navigate("BirthChartForm")}
-          variant={profile ? "secondary" : "primary"} style={{ marginTop: spacing.sm }} />
+        <SectionHeader title="Quick Actions" />
+        <View style={styles.quickRow}>
+          <QuickAccessItem icon="🛕" label="Find Temples" onPress={() => navigation.navigate("TempleSearch")} />
+          <QuickAccessItem icon="🪐" label="Birth Chart" onPress={() => navigation.navigate("BirthChartForm")} />
+          <QuickAccessItem icon="🛕" label="Book Puja" onPress={() => navigation.navigate("BookPuja")} />
+          <QuickAccessItem icon="📖" label="Learn More" onPress={() => navigation.getParent()?.navigate("rituals")} />
+        </View>
 
-        <SearchBar placeholder="Search temples by name or deity..." onPress={() => navigation.navigate("TempleSearch")} />
-
-        <PromoCard title="🛕 Book a Puja" subtitle="Browse pujas, select a priest, and book your ceremony"
-          onPress={() => navigation.navigate("BookPuja")} />
+        <SearchBar placeholder="Search temples, deities, or cities..." onPress={() => navigation.navigate("TempleSearch")} />
+        <PromoCard title="Book a Puja Online" subtitle="Browse 18 pujas, select a verified priest, and book your ceremony." onPress={() => navigation.navigate("BookPuja")} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -142,18 +93,15 @@ const styles = StyleSheet.create({
   logo: { fontSize: 24, marginRight: spacing.sm },
   headerTitle: { color: colors.primary, fontSize: 20, fontWeight: "800" },
   headerRight: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  headerIcon: { fontSize: 20, marginLeft: spacing.md },
-  badge: { position: "absolute", top: -4, right: -4, backgroundColor: colors.primary, borderRadius: 10, width: 18, height: 18, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: colors.card },
-  badgeText: { color: colors.card, fontSize: 10, fontWeight: "700" },
-  content: { padding: spacing.md, paddingBottom: spacing.xl },
+  headerIcon: { fontSize: 20 },
   greeting: { color: colors.text, fontSize: 20, fontWeight: "700", marginBottom: spacing.md },
-  loading: { color: colors.textMuted, textAlign: "center", marginVertical: spacing.lg },
-  sectionTitle: { color: colors.text, fontSize: 17, fontWeight: "700", marginBottom: spacing.xs },
+  sectionTitle: { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing.xs },
   sub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  profileCardBox: { backgroundColor: colors.cardAlt, borderColor: colors.primary, borderWidth: 1 },
+  profileBox: { backgroundColor: colors.cardAlt, borderColor: colors.primary, borderWidth: 1 },
   sugCard: { borderColor: colors.accent, borderWidth: 1, backgroundColor: colors.cardAlt },
   sugTitle: { color: colors.accent, fontSize: 15, fontWeight: "700", marginBottom: spacing.xs },
   sugBody: { color: colors.text, fontSize: 13, lineHeight: 18 },
-  templeName: { color: colors.text, fontSize: 15, fontWeight: "700" },
+  tName: { color: colors.text, fontSize: 15, fontWeight: "700" },
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: "700", marginBottom: spacing.xs },
+  quickRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.lg },
 });

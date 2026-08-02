@@ -102,3 +102,28 @@ export async function setReminder(placeId: string): Promise<any> {
 export async function removeReminder(placeId: string, reminderId: string): Promise<void> {
   await apiClient.delete(`/temples/${placeId}/reminders/${reminderId}`);
 }
+
+export interface TempleEventsAndPujas {
+  source: "db" | "api";
+  events: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    date: string;
+    time: string | null;
+  }>;
+  pujas: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    schedule: string | null;
+    time: string | null;
+  }>;
+  message?: string;
+}
+
+export async function getTempleEventsAndPujas(placeId: string): Promise<TempleEventsAndPujas> {
+  const { data } = await apiClient.get(`/temples/${placeId}/events`);
+  return data;
+}
+
