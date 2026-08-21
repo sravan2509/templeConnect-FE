@@ -8,6 +8,7 @@ import ForgotPasswordScreen from "../screens/Auth/ForgotPasswordScreen";
 import ResetPasswordScreen from "../screens/Auth/ResetPasswordScreen";
 import LandingScreen from "../screens/Auth/LandingScreen";
 import { PriestTabs } from "./PriestTabs";
+import { AdminTabs } from "./AdminTabs";
 import { MainTabs } from "./MainTabs";
 import { colors } from "../theme";
 
@@ -32,7 +33,7 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
       {user ? (
-        isPriest && !isAdmin ? <PriestTabs /> : <MainTabs />
+        isAdmin ? <AdminTabs /> : isPriest ? <PriestTabs /> : <MainTabs />
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Landing">
           <Stack.Screen name="Landing" component={LandingScreen} />

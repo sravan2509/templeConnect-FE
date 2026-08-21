@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, spacing, radius } from "../../theme";
@@ -12,6 +12,8 @@ import { useAuth } from "../../context/AuthContext";
 import { getAstroProfile } from "../../api/astrology";
 import { getDailySuggestion, getUnreadCount } from "../../api/admin";
 import { getTemplesNearby } from "../../api/temples";
+import { useFocusEffect } from "@react-navigation/native";
+import * as Location from "expo-location";
 
 export default function HomeScreen({ navigation }: any) {
   const { user, isAdmin } = useAuth();
@@ -19,23 +21,54 @@ export default function HomeScreen({ navigation }: any) {
   const [suggestion, setSuggestion] = useState<any>(null);
   const [temples, setTemples] = useState<any[]>([]);
   const [unread, setUnread] = useState(0);
+  const [locationMsg, setLocationMsg] = useState<string>("Locating nearby temples...");
 
   useEffect(() => {
     (async () => {
       try { setProfile(await getAstroProfile()); } catch {}
       try { setSuggestion(await getDailySuggestion()); } catch {}
-      try { const c = await getUnreadCount(); setUnread(c.count); } catch {}
     })();
   }, []);
 
+  // Refresh unread count every time screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      (async () => {
+        try {
+          const c = await getUnreadCount();
+          if (isActive) setUnread(c.count);
+        } catch {}
+      })();
+      return () => { isActive = false; };
+    }, [])
+  );
+
   useEffect(() => {
-    if (!profile) return;
     (async () => {
       try {
-        const deity = profile.deityRecommendation.primaryDeity;
-        const nearby = await getTemplesNearby(profile.birthDetails.lat, profile.birthDetails.lng, deity, 200);
-        setTemples(nearby.data || []);
-      } catch {}
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationMsg("Location permission denied. Showing popular temples.");
+          // Fallback to a default location or just general temples
+          const nearby = await getTemplesNearby(20.5937, 78.9629, profile?.deityRecommendation?.primaryDeity || "Shiva", 1000);
+          setTemples(nearby.data || []);
+          return;
+        }
+
+        let location = await Location.getCurrentPositionAsync({});
+        const deity = profile?.deityRecommendation?.primaryDeity || "Shiva";
+        const nearby = await getTemplesNearby(location.coords.latitude, location.coords.longitude, deity, 200);
+        
+        if (nearby.data && nearby.data.length > 0) {
+          setTemples(nearby.data);
+          setLocationMsg("");
+        } else {
+          setLocationMsg("No temples found nearby.");
+        }
+      } catch (e) {
+        setLocationMsg("Could not get location.");
+      }
     })();
   }, [profile]);
 
@@ -47,8 +80,13 @@ export default function HomeScreen({ navigation }: any) {
           <Text style={styles.headerTitle}>Temple Connect</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => navigation.push("Node", { tabId: "home", nodeId: "notifications" })}>
-            <Text style={styles.headerIcon}>🔔{unread > 0 ? <Text style={{ color: colors.danger, fontSize: 10 }}> {unread}</Text> : null}</Text>
+          <TouchableOpacity onPress={() => navigation.push("Node", { tabId: "home", nodeId: "notifications" })} style={{ position: "relative" }}>
+            <Text style={styles.headerIcon}>🔔</Text>
+            {unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           {isAdmin && <TouchableOpacity onPress={() => navigation.navigate("AdminDashboard")}><Text style={styles.headerIcon}>⚙️</Text></TouchableOpacity>}
           <TouchableOpacity onPress={() => navigation.getParent()?.navigate("profile")}><Text style={styles.headerIcon}>👤</Text></TouchableOpacity>
@@ -65,7 +103,16 @@ export default function HomeScreen({ navigation }: any) {
             </Card>
             <PromoCard title={`🛕 Lord ${profile.deityRecommendation.primaryDeity}`} subtitle="Your recommended deity based on your birth star." onPress={() => navigation.navigate("TempleSearch")} />
             {suggestion && <Card style={styles.sugCard}><Text style={styles.sugTitle}>💫 {suggestion.title}</Text><Text style={styles.sugBody}>{suggestion.body}</Text></Card>}
-            {temples.length > 0 && <><SectionHeader title={`${profile.deityRecommendation.primaryDeity} Temples Near You`} />{temples.slice(0, 4).map((t: any, i: number) => <TouchableOpacity key={t.placeId || i} onPress={() => navigation.navigate("TempleDetail", { temple: t })}><Card><Text style={styles.tName}>🛕 {t.name}</Text><Text style={styles.sub}>{t.city}, {t.state}{t.distanceKm ? ` · ${t.distanceKm.toFixed(0)}km` : ""}</Text></Card></TouchableOpacity>)}</>}
+            <SectionHeader title={profile?.deityRecommendation?.primaryDeity ? `${profile.deityRecommendation.primaryDeity} Temples Near You` : "Temples Near You"} />
+            {locationMsg !== "" && temples.length === 0 && <Text style={styles.sub}>{locationMsg}</Text>}
+            {temples.length > 0 && temples.slice(0, 4).map((t: any, i: number) => (
+              <TouchableOpacity key={t.placeId || i} onPress={() => navigation.navigate("TempleDetail", { temple: t })}>
+                <Card>
+                  <Text style={styles.tName}>🛕 {t.name}</Text>
+                  <Text style={styles.sub}>{t.city || ""}{t.city && t.state ? ", " : ""}{t.state || ""}{t.distanceKm ? ` · ${t.distanceKm.toFixed(0)}km away` : ""}</Text>
+                </Card>
+              </TouchableOpacity>
+            ))}
           </>
         ) : (
           <Card><Text style={styles.emptyTitle}>Set Up Your Spiritual Profile</Text><Text style={styles.sub}>Enter your birth details to discover your Nakshatra, Rashi, and deity.</Text><Button title="Enter Birth Details" onPress={() => navigation.navigate("BirthChartForm")} style={{ marginTop: spacing.md }} /></Card>
@@ -104,4 +151,6 @@ const styles = StyleSheet.create({
   tName: { color: colors.text, fontSize: 15, fontWeight: "700" },
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: "700", marginBottom: spacing.xs },
   quickRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.lg },
+  badge: { position: "absolute", top: -6, right: -8, backgroundColor: colors.danger, borderRadius: 10, minWidth: 18, height: 18, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 });

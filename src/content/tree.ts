@@ -95,6 +95,7 @@ export const tabs: TabTree[] = [
       kind: "hub",
       children: [
         { id: "my-spiritual-profile", title: "My Spiritual Profile", icon: "🕉️", kind: "birth-chart-result" },
+        { id: "saved-temples", title: "Saved Temples", icon: "★", kind: "detail", subtitle: "Temples you have bookmarked" },
         { id: "notification-preferences", title: "Notifications", icon: "🔔", kind: "detail", rows: [
           { icon: "🛕", label: "Puja Reminders", toggle: true, defaultOn: true },
           { icon: "📅", label: "Booking Updates", toggle: true, defaultOn: true },

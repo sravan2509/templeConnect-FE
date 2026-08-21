@@ -5,7 +5,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { colors, spacing, radius } from "../../theme";
 import { Screen } from "../../components/Screen";
 import { Button } from "../../components/Button";
-import { getChatUsers, getMessages, sendMessage } from "../../api/admin";
+import { getChatUsers, getMessages, sendMessage, markChatRead } from "../../api/admin";
 import { useAuth } from "../../context/AuthContext";
 
 export default function PriestChatScreen() {
@@ -42,10 +42,10 @@ export default function PriestChatScreen() {
       try {
         const msgs = await getMessages(selectedUser.id);
         if (isActive) {
-          // Replace entire list from server (source of truth) to avoid duplicates
-          // from the optimistic append in handleSend
           setMessages(msgs);
         }
+        // Mark as read when messages are fetched
+        await markChatRead(selectedUser.id);
       } catch {}
     };
     fetchMsgs();
@@ -59,7 +59,6 @@ export default function PriestChatScreen() {
     setText("");
     try {
       const msg = await sendMessage(selectedUser.id, currentText);
-      // Optimistically append only if not already present (avoids duplicates with polling)
       setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     } catch {}
@@ -86,9 +85,16 @@ export default function PriestChatScreen() {
               <View key={i} style={[styles.msgWrap, isMe ? styles.msgMeWrap : styles.msgThemWrap]}>
                 <View style={[styles.msgBubble, isMe ? styles.msgMe : styles.msgThem]}>
                   <Text style={[styles.msgText, isMe ? styles.msgMeText : styles.msgThemText]}>{m.text}</Text>
-                  <Text style={[styles.msgTime, isMe ? styles.msgMeTime : styles.msgThemTime]}>
-                    {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+                  <View style={styles.msgFooter}>
+                    <Text style={[styles.msgTime, isMe ? styles.msgMeTime : styles.msgThemTime]}>
+                      {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    {isMe && (
+                      <Text style={[styles.msgStatus, { color: m.read ? "#87CEEB" : "rgba(255,255,255,0.7)" }]}>
+                        {m.read ? " ✓✓" : " ✓"}
+                      </Text>
+                    )}
+                  </View>
                 </View>
               </View>
             );
@@ -122,7 +128,14 @@ export default function PriestChatScreen() {
         )}
         {!loading && users.map((u, i) => (
           <TouchableOpacity key={i} style={styles.userCard} onPress={() => setSelectedUser(u)}>
-            <Text style={styles.userName}>{u.name}</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={styles.userName}>{u.name}</Text>
+              {u.unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>{u.unreadCount}</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.sub}>Tap to view messages</Text>
           </TouchableOpacity>
         ))}
@@ -140,6 +153,8 @@ const styles = StyleSheet.create({
   userCard: { backgroundColor: colors.card, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
   userName: { color: colors.text, fontSize: 16, fontWeight: "700" },
   sub: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs },
+  unreadBadge: { backgroundColor: colors.danger, borderRadius: 12, minWidth: 24, height: 24, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  unreadBadgeText: { color: "#fff", fontSize: 12, fontWeight: "800" },
   
   msgWrap: { flexDirection: "row", marginBottom: spacing.sm },
   msgMeWrap: { justifyContent: "flex-end" },
@@ -150,9 +165,11 @@ const styles = StyleSheet.create({
   msgText: { fontSize: 15 },
   msgMeText: { color: "#fff" },
   msgThemText: { color: colors.text },
-  msgTime: { fontSize: 10, marginTop: 4, alignSelf: "flex-end" },
+  msgFooter: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 4 },
+  msgTime: { fontSize: 10 },
   msgMeTime: { color: "rgba(255,255,255,0.7)" },
   msgThemTime: { color: colors.textMuted },
+  msgStatus: { fontSize: 10, marginLeft: 4 },
   
   inputArea: { flexDirection: "row", padding: spacing.md, backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border, alignItems: "center" },
   input: { flex: 1, backgroundColor: colors.bg, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, marginRight: spacing.sm, borderWidth: 1, borderColor: colors.border },

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { ListRow } from "../components/ListRow";
@@ -11,7 +11,7 @@ import { colors, spacing } from "../theme";
 import { findNode, TreeNode } from "../content/tree";
 import { useAuth } from "../context/AuthContext";
 import { getErrorMessage } from "../api/client";
-import { getFAQs, searchKnowledgeBase, getNotificationPrefs, updateNotificationPrefs, getCheckins, getBookingHistory } from "../api/profile";
+import { getFAQs, searchKnowledgeBase, getNotificationPrefs, updateNotificationPrefs, getCheckins, getBookingHistory, getBookmarks } from "../api/profile";
 import { listBookings } from "../api/connect";
 import { getForecast, getRecommendations } from "../api/astrology";
 import { getNotifications, markAllNotificationsRead } from "../api/admin";
@@ -39,6 +39,7 @@ export default function NodeScreen({ route, navigation }: any) {
         }
         case "upcoming-bookings": { setData(await listBookings("upcoming")); break; }
         case "booking-history": { setData(await getBookingHistory()); break; }
+        case "saved-temples": { setData(await getBookmarks()); break; }
         case "notification-preferences": { setData(await getNotificationPrefs()); break; }
         case "help-center": { setData(await getFAQs()); break; }
         case "notifications": { 
@@ -121,11 +122,33 @@ export default function NodeScreen({ route, navigation }: any) {
         );
         if (item.title) return <Card key={i}><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.detailText}>{item.summary || item.answer || item.content}</Text></Card>;
         if (item.question) return <Card key={i}><Text style={styles.cardTitle}>{item.question}</Text><Text style={styles.detailText}>{item.answer}</Text></Card>;
-        if (item.puja?.name) return <Card key={i}><Text style={styles.cardTitle}>{item.puja.icon} {item.puja.name}</Text><Text style={styles.sub}>Priest: {item.priest?.name} · {new Date(item.scheduledAt).toLocaleDateString()}</Text><Text style={[styles.status, item.status === "confirmed" && {color: colors.success}]}>{item.status.toUpperCase()}</Text></Card>;
+        if (item.puja?.name) return (
+          <Card key={i}>
+            <Text style={styles.cardTitle}>{item.puja.icon} {item.puja.name}</Text>
+            <Text style={styles.sub}>Priest: {item.priest?.name} · {new Date(item.scheduledAt).toLocaleDateString()}</Text>
+            <Text style={[styles.status, item.status === "confirmed" && {color: colors.success}]}>{item.status.toUpperCase()}</Text>
+            {item.status === "confirmed" && item.priest && item.priest.userId && (
+              <Button 
+                title="💬 Chat with Priest" 
+                variant="secondary" 
+                style={{ marginTop: spacing.sm, alignSelf: "flex-start", paddingHorizontal: spacing.md, paddingVertical: spacing.xs }} 
+                onPress={() => navigation.navigate("DevoteeChat", { priestId: item.priest.userId, priestName: item.priest.name })}
+              />
+            )}
+          </Card>
+        );
+        if (item.placeId && !item.puja) return (
+          <TouchableOpacity key={i} onPress={() => navigation.navigate("TempleDetail", { temple: { name: item.name, placeId: item.placeId, address: item.address, lat: item.lat, lon: item.lon } })}>
+            <Card>
+              <Text style={styles.cardTitle}>🛕 {item.name}</Text>
+              {item.address && <Text style={styles.sub}>{item.address}</Text>}
+            </Card>
+          </TouchableOpacity>
+        );
         return null;
       });
     }
-    if (typeof data === "object" && data?.pujaReminders !== undefined) {
+    if (typeof data === "object" && data !== null && data?.pujaReminders !== undefined) {
       const handleToggle = (key: string) => (val: boolean) => {
         const updated = { ...data, [key]: val };
         setData(updated);
@@ -142,6 +165,18 @@ export default function NodeScreen({ route, navigation }: any) {
     }
     return <Card><Text style={styles.detailText}>Content loaded.</Text></Card>;
   }
+
+  return (
+    <Screen>
+      <View style={{ padding: spacing.md }}>
+        <Text style={{ fontSize: 24, fontWeight: "700", color: colors.primary, marginBottom: spacing.sm }}>
+          {node?.icon ? node.icon + " " : ""}{node?.title || ""}
+        </Text>
+        {node?.subtitle ? <Text style={styles.subtitle}>{node.subtitle}</Text> : null}
+        {renderContent()}
+      </View>
+    </Screen>
+  );
 }
 
 const styles = StyleSheet.create({

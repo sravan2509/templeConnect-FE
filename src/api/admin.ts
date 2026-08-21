@@ -289,3 +289,38 @@ export async function deleteSuggestion(id: string): Promise<void> {
   await apiClient.delete(`/admin/suggestions/${id}`);
 }
 
+// ── Temple Upload & Management ──────────────────────────────
+
+export async function uploadTemplesFile(file: any): Promise<any> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await apiClient.post("/admin/temples/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
+export async function downloadTempleTemplate(): Promise<string> {
+  // Returns the URL for downloading the template
+  return `${apiClient.defaults.baseURL}/admin/temples/template`;
+}
+
+export async function listAllDBTemples(): Promise<any[]> {
+  const { data } = await apiClient.get("/admin/temples");
+  return data;
+}
+
+export async function updateDBTemple(id: string, templeData: any): Promise<any> {
+  const { data } = await apiClient.patch(`/admin/temples/${id}`, templeData);
+  return data;
+}
+
+export async function deleteDBTemple(id: string): Promise<void> {
+  await apiClient.delete(`/admin/temples/${id}`);
+}
+
+// ── Chat Mark Read ──────────────────────────────────────────
+
+export async function markChatRead(userId: string): Promise<void> {
+  await apiClient.patch(`/chat/${userId}/read`);
+}

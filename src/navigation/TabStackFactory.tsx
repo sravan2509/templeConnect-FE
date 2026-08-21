@@ -9,6 +9,7 @@ import BookPujaScreen from "../screens/BookPujaScreen";
 import MapScreen from "../screens/MapScreen";
 import AdminDashboardScreen from "../screens/AdminDashboardScreen";
 import ChangePasswordScreen from "../screens/ChangePasswordScreen";
+import DevoteeChatScreen from "../screens/Connect/DevoteeChatScreen";
 import { colors } from "../theme";
 import { findNode, tabs } from "../content/tree";
 
@@ -38,6 +39,7 @@ export function createTabStack(tabId: string) {
         <Stack.Screen name="Map" component={MapScreen} options={{ title: "Map" }} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: "Admin" }} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: "Change Password" }} />
+        <Stack.Screen name="DevoteeChat" component={DevoteeChatScreen} options={{ title: "Chat with Priest" }} />
       </Stack.Navigator>
     );
   };

@@ -11,6 +11,11 @@ export interface BirthChart {
   rashi: string | null;
 }
 
+export async function autocompleteCities(place: string): Promise<Array<{ label: string, lat: number, lon: number }>> {
+  const { data } = await apiClient.get("/locations/autocomplete-cities", { params: { place } });
+  return data;
+}
+
 export interface RashiData {
   name: string;
   englishName: string;
