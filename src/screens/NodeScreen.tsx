@@ -165,18 +165,6 @@ export default function NodeScreen({ route, navigation }: any) {
     }
     return <Card><Text style={styles.detailText}>Content loaded.</Text></Card>;
   }
-
-  return (
-    <Screen>
-      <View style={{ padding: spacing.md }}>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: colors.primary, marginBottom: spacing.sm }}>
-          {node?.icon ? node.icon + " " : ""}{node?.title || ""}
-        </Text>
-        {node?.subtitle ? <Text style={styles.subtitle}>{node.subtitle}</Text> : null}
-        {renderContent()}
-      </View>
-    </Screen>
-  );
 }
 
 const styles = StyleSheet.create({

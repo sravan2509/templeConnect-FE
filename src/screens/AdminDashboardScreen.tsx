@@ -6,12 +6,12 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { SectionHeader } from "../components/SectionHeader";
 import { colors, spacing, radius } from "../theme";
-import { getAdminDashboard, createPriest, updatePriest, deletePriest, listPujas, createPuja, updatePuja, deletePuja, listKbArticles, createKbArticle, updateKbArticle, deleteKbArticle, createFaq, updateFaq, deleteFaq, listSuggestions, createSuggestion, updateSuggestion, deleteSuggestion } from "../api/admin";
+import { getAdminDashboard, createPriest, updatePriest, deletePriest, listPujas, createPuja, updatePuja, deletePuja, listKbArticles, createKbArticle, updateKbArticle, deleteKbArticle, createFaq, updateFaq, deleteFaq, listSuggestions, createSuggestion, updateSuggestion, deleteSuggestion, importTemplesCSV } from "../api/admin";
 import { getFAQs as getFaqs } from "../api/profile";
 import { listPriests } from "../api/connect";
 import { getErrorMessage } from "../api/client";
 
-type Tab = "dashboard" | "pujas" | "priests" | "content";
+type Tab = "dashboard" | "pujas" | "priests" | "content" | "import";
 
 export default function AdminDashboardScreen() {
   const [tab, setTab] = useState<Tab>("dashboard");
@@ -99,9 +99,9 @@ export default function AdminDashboardScreen() {
   return (
     <Screen scroll={false}>
       <View style={styles.tabRow}>
-        {(["dashboard", "pujas", "priests", "content"] as Tab[]).map(t => (
+        {(["dashboard", "pujas", "priests", "content", "import"] as Tab[]).map(t => (
           <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t === "dashboard" ? "📊" : t === "pujas" ? "🛕" : t === "priests" ? "🧑‍🦱" : "📝"}</Text>
+            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t === "dashboard" ? "📊" : t === "pujas" ? "🛕" : t === "priests" ? "🧑‍🦱" : t === "content" ? "📝" : "📥"}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -200,6 +200,8 @@ export default function AdminDashboardScreen() {
         )}
 
         {tab === "content" && <ContentTab />}
+
+        {tab === "import" && <ImportTab />}
       </ScrollView>
     </Screen>
   );
@@ -299,6 +301,41 @@ function ContentTab() {
           </View>
         </Card>
       ))}
+    </View>
+  );
+}
+
+function ImportTab() {
+  const [csvText, setCsvText] = useState("");
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleImport() {
+    if (!csvText.trim()) { Alert.alert("Error", "Paste CSV data first"); return; }
+    setLoading(true);
+    try {
+      const res = await importTemplesCSV(csvText);
+      setResult(res);
+      Alert.alert("Import Done", `Created: ${res.created}, Merged: ${res.merged}, Skipped: ${res.skipped}, Google enriched: ${res.googleEnriched}`);
+    } catch (e: any) { Alert.alert("Error", e?.friendlyMessage || "Import failed"); }
+    setLoading(false);
+  }
+
+  return (
+    <View>
+      <SectionHeader title="Import Temples (CSV)" />
+      <Card>
+        <Text style={styles.sub}>Paste CSV content with columns: name, city, state, deity, address, lat, lon, phone, website, history, significance, sevas</Text>
+        <Text style={styles.sub}>First row must be headers. Duplicate temples (same name+city) are merged automatically. If Google API key is set, missing lat/lon are auto-enriched.</Text>
+        <TextField label="CSV Data" value={csvText} onChangeText={setCsvText} placeholder={'name,city,state,deity,lat,lon\nSomeswara Temple,Bhimavaram,Andhra Pradesh,Shiva,16.54,81.78\n...'} />
+        <Button title={loading ? "Importing..." : "Import & Merge"} onPress={handleImport} loading={loading} />
+      </Card>
+      {result && (
+        <Card>
+          <Text style={styles.name}>Results</Text>
+          <Text style={styles.sub}>Created: {result.created} | Merged: {result.merged} | Skipped: {result.skipped} | Google enriched: {result.googleEnriched}</Text>
+        </Card>
+      )}
     </View>
   );
 }

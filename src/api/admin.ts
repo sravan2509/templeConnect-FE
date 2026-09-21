@@ -289,6 +289,11 @@ export async function deleteSuggestion(id: string): Promise<void> {
   await apiClient.delete(`/admin/suggestions/${id}`);
 }
 
+export async function importTemplesCSV(csv: string): Promise<any> {
+  const { data } = await apiClient.post("/admin/import-temples", { csv });
+  return data;
+}
+
 // ── Temple Upload & Management ──────────────────────────────
 
 export async function uploadTemplesFile(file: any): Promise<any> {
