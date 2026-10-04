@@ -1,12 +1,4 @@
-export type NodeKind = "hub" | "detail" | "temple-search" | "birth-chart-form" | "birth-chart-result" | "map-view" | "admin-dashboard" | "book-puja";
-
-export interface DetailRow {
-  icon?: string;
-  label: string;
-  value?: string;
-  toggle?: boolean;
-  defaultOn?: boolean;
-}
+export type NodeKind = "hub" | "detail" | "temple-search" | "birth-chart-form" | "birth-chart-result" | "map-view" | "book-puja";
 
 export interface TreeNode {
   id: string;
@@ -15,7 +7,6 @@ export interface TreeNode {
   icon?: string;
   kind?: NodeKind;
   children?: TreeNode[];
-  rows?: DetailRow[];
 }
 
 export interface TabTree {
@@ -47,7 +38,10 @@ export const tabs: TabTree[] = [
       title: "Temples",
       kind: "hub",
       children: [
-        { id: "temple-search-filters", title: "Search Temples", icon: "🔍", kind: "temple-search", subtitle: "Search by name, deity, or state with autocomplete" },
+        { id: "temple-search-filters", title: "Search Temples", icon: "🔍", kind: "temple-search", subtitle: "Search by name, deity, city or state" },
+        { id: "temple-map", title: "Temple Map", icon: "🗺️", kind: "map-view", subtitle: "Explore temples on the map" },
+        { id: "saved-temples", title: "Saved Temples", icon: "⭐", kind: "detail", subtitle: "Temples you have bookmarked" },
+        { id: "temple-guidelines", title: "Temple Guidelines", icon: "📋", kind: "detail", subtitle: "Do's and don'ts when visiting a temple" },
       ],
     },
   },
@@ -61,6 +55,7 @@ export const tabs: TabTree[] = [
       children: [
         { id: "astrology-profile-setup", title: "Astrology Profile", icon: "🪐", kind: "hub", children: [
           { id: "input-edit-birth-data", title: "Input or Edit Birth Data", icon: "✏️", kind: "birth-chart-form" },
+          { id: "view-astro-profile", title: "View My Profile", icon: "🕉️", kind: "birth-chart-result" },
         ]},
         { id: "knowledge-base", title: "Knowledge Base", icon: "📚", kind: "hub", children: [
           { id: "cultural-content", title: "Cultural Content", icon: "🎭", kind: "detail" },
@@ -78,7 +73,7 @@ export const tabs: TabTree[] = [
       title: "Connect",
       kind: "hub",
       children: [
-        { id: "book-puja-flow", title: "Book a Puja", icon: "🛕", kind: "book-puja", subtitle: "Browse pujas, select priest, and book" },
+        { id: "book-puja-flow", title: "Book a Puja", icon: "🛕", kind: "book-puja", subtitle: "Browse pujas, select a priest, and book" },
         { id: "my-bookings", title: "My Bookings", icon: "📋", kind: "hub", children: [
           { id: "upcoming-bookings", title: "Upcoming Bookings", icon: "⏳", kind: "detail" },
           { id: "booking-history", title: "Booking History", icon: "✅", kind: "detail" },
@@ -95,13 +90,11 @@ export const tabs: TabTree[] = [
       kind: "hub",
       children: [
         { id: "my-spiritual-profile", title: "My Spiritual Profile", icon: "🕉️", kind: "birth-chart-result" },
-        { id: "saved-temples", title: "Saved Temples", icon: "★", kind: "detail", subtitle: "Temples you have bookmarked" },
-        { id: "notification-preferences", title: "Notifications", icon: "🔔", kind: "detail", rows: [
-          { icon: "🛕", label: "Puja Reminders", toggle: true, defaultOn: true },
-          { icon: "📅", label: "Booking Updates", toggle: true, defaultOn: true },
-          { icon: "💫", label: "Daily Suggestions", toggle: true, defaultOn: true },
-        ]},
-        { id: "help-center", title: "FAQs", icon: "❓", kind: "detail" },
+        { id: "account", title: "Account", icon: "👤", kind: "detail", subtitle: "Edit your name or delete your account" },
+        { id: "saved-temples", title: "Saved Temples", icon: "⭐", kind: "detail", subtitle: "Temples you have bookmarked" },
+        { id: "visit-history", title: "Visit History", icon: "📍", kind: "detail", subtitle: "Temples you have checked in to" },
+        { id: "notification-preferences", title: "Notification Settings", icon: "🔔", kind: "detail" },
+        { id: "help-center", title: "Help & Support", icon: "❓", kind: "detail", subtitle: "FAQs and contact support" },
       ],
     },
   },

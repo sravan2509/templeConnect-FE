@@ -1,11 +1,12 @@
 import { StyleSheet, Text, TextInput, TextInputProps, View } from "react-native";
 import { colors, radius, spacing } from "../theme";
 
-export function TextField({ label, ...props }: TextInputProps & { label: string }) {
+export function TextField({ label, style, hint, ...props }: TextInputProps & { label?: string; hint?: string }) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput placeholderTextColor={colors.textMuted} style={styles.input} {...props} />
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+      <TextInput placeholderTextColor={colors.textMuted} {...props} style={[styles.input, props.multiline && styles.multiline, style]} />
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -23,4 +24,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 4,
     fontSize: 16,
   },
+  multiline: { minHeight: 90, textAlignVertical: "top" },
+  hint: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs },
 });

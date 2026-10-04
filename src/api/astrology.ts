@@ -49,6 +49,7 @@ export interface AstroProfile {
     place: string;
     lat: number;
     lng: number;
+    timezone?: string;
   };
   rashi: RashiData;
   nakshatra: NakshatraData;
@@ -73,7 +74,7 @@ export async function submitBirthChart(
   place: string,
   lat?: number,
   lng?: number
-): Promise<BirthChart & { profile: AstroProfile; deityRecommendation: DeityRecommendation }> {
+): Promise<BirthChart & { profile: Omit<AstroProfile, "birthDetails" | "deityRecommendation">; deityRecommendation: DeityRecommendation }> {
   const { data } = await apiClient.post("/astrology/birth-chart", { dob, time, place, lat, lng });
   return data;
 }

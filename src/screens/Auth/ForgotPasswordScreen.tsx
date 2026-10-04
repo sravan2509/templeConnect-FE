@@ -5,26 +5,25 @@ import { TextField } from "../../components/TextField";
 import { Button } from "../../components/Button";
 import { SectionHeader } from "../../components/SectionHeader";
 import { colors, spacing } from "../../theme";
-import { forgotPassword } from "../../api/auth";
-import { getErrorMessage } from "../../api/client";
+import { forgotPassword, isValidEmail } from "../../api/auth";
+import { showAuthError } from "./LoginScreen";
 
-export default function ForgotPasswordScreen({ navigation }: any) {
-  const [email, setEmail] = useState("");
+export default function ForgotPasswordScreen({ navigation, route }: any) {
+  const [email, setEmail] = useState(route.params?.email || "");
   const [loading, setLoading] = useState(false);
 
   async function handleRequestReset() {
-    if (!email) {
-      Alert.alert("Error", "Please enter your email");
-      return;
-    }
+    if (!isValidEmail(email)) return Alert.alert("Check your email", "Please enter a valid email address.");
     setLoading(true);
     try {
-      const res = await forgotPassword(email.toLowerCase());
-      // For development, we show the code in an alert. In production, this would be an email.
-      Alert.alert("Reset Code Sent", `Use this code to reset: ${res.code}`);
-      navigation.navigate("ResetPassword", { email: email.toLowerCase() });
-    } catch (err: any) {
-      Alert.alert("Error", getErrorMessage(err));
+      const normalized = email.trim().toLowerCase();
+      const res = await forgotPassword(normalized);
+      // devCode is only returned by a development backend with DEV_EXPOSE_RESET_CODE=true.
+      const devNote = __DEV__ && res.devCode ? `\n\n(Development) Your code is ${res.devCode}` : "";
+      Alert.alert("Check your email", `${res.message}${devNote}`);
+      navigation.navigate("ResetPassword", { email: normalized });
+    } catch (err) {
+      showAuthError("Error", err);
     } finally {
       setLoading(false);
     }
@@ -32,18 +31,23 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 
   return (
     <Screen safeTop>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back} hitSlop={12}>
+        <Text style={styles.backText}>‹ Back</Text>
+      </TouchableOpacity>
       <SectionHeader title="Forgot Password" />
-      <Text style={styles.subtitle}>Enter your email to receive a reset code</Text>
+      <Text style={styles.subtitle}>Enter your email and we'll send you a 6-digit reset code.</Text>
       <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" />
       <Button title="Send Reset Code" onPress={handleRequestReset} loading={loading} style={{ marginTop: spacing.sm }} />
-      <TouchableOpacity onPress={() => navigation.navigate("Login")} style={styles.link}>
-        <Text style={styles.linkText}>Back to Log In</Text>
+      <TouchableOpacity onPress={() => navigation.navigate("ResetPassword", { email: email.trim().toLowerCase() })} style={styles.link}>
+        <Text style={styles.linkText}>I already have a code</Text>
       </TouchableOpacity>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  back: { marginBottom: spacing.md, marginTop: spacing.sm, alignSelf: "flex-start" },
+  backText: { color: colors.primary, fontWeight: "600", fontSize: 16 },
   subtitle: { color: colors.textMuted, marginBottom: spacing.lg },
   link: { marginTop: spacing.lg, alignItems: "center" },
   linkText: { color: colors.accent },

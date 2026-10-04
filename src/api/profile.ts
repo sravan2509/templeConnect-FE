@@ -1,9 +1,10 @@
-import { apiClient } from "./client";
+import { apiClient, seg } from "./client";
 
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  role: string;
 }
 
 export interface Checkin {
@@ -23,17 +24,12 @@ export interface Donation {
   donatedAt: string;
 }
 
-export interface Subscription {
-  plan: string;
-  renewsAt: string | null;
-  paymentMethod: string | null;
-}
-
 export interface NotificationPrefs {
   pujaReminders: boolean;
   templeEventAlerts: boolean;
   bookingUpdates: boolean;
   promotionalOffers: boolean;
+  dailySuggestions: boolean;
 }
 
 export interface Bookmark {
@@ -43,6 +39,14 @@ export interface Bookmark {
   address?: string;
   lat?: number;
   lon?: number;
+}
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  message: string;
+  status: string;
+  createdAt: string;
 }
 
 export async function getMe(): Promise<UserProfile> {
@@ -55,17 +59,16 @@ export async function updateMe(name: string): Promise<UserProfile> {
   return data;
 }
 
+export async function deleteAccount(password: string): Promise<void> {
+  await apiClient.delete("/users/me", { data: { password } });
+}
+
 export async function getCheckins(): Promise<Checkin[]> {
   const { data } = await apiClient.get("/users/me/checkins");
   return data;
 }
 
-export async function createCheckin(
-  templeName: string,
-  placeId?: string,
-  lat?: number,
-  lon?: number
-): Promise<Checkin> {
+export async function createCheckin(templeName: string, placeId?: string, lat?: number, lon?: number): Promise<Checkin> {
   const { data } = await apiClient.post("/users/me/checkins", { templeName, placeId, lat, lon });
   return data;
 }
@@ -75,44 +78,18 @@ export async function getDonations(): Promise<Donation[]> {
   return data;
 }
 
-export async function createDonation(templeName: string, amount: number, placeId?: string): Promise<Donation> {
-  const { data } = await apiClient.post("/donations", { templeName, amount, placeId });
-  return data;
-}
-
 export async function getBookmarks(): Promise<Bookmark[]> {
   const { data } = await apiClient.get("/users/me/bookmarks");
   return data;
 }
 
-export async function createBookmark(
-  placeId: string,
-  name: string,
-  address?: string,
-  lat?: number,
-  lon?: number
-): Promise<Bookmark> {
+export async function createBookmark(placeId: string, name: string, address?: string, lat?: number, lon?: number): Promise<Bookmark> {
   const { data } = await apiClient.post("/users/me/bookmarks", { placeId, name, address, lat, lon });
   return data;
 }
 
 export async function deleteBookmark(id: string): Promise<void> {
-  await apiClient.delete(`/users/me/bookmarks/${id}`);
-}
-
-export async function getSubscriptionPlan(): Promise<Subscription> {
-  const { data } = await apiClient.get("/subscriptions/plan");
-  return data;
-}
-
-export async function upgradePlan(plan: "premium_monthly" | "premium_yearly"): Promise<Subscription> {
-  const { data } = await apiClient.post("/subscriptions/upgrade", { plan });
-  return data;
-}
-
-export async function cancelSubscription(): Promise<Subscription> {
-  const { data } = await apiClient.post("/subscriptions/cancel");
-  return data;
+  await apiClient.delete(`/users/me/bookmarks/${seg(id)}`);
 }
 
 export async function getNotificationPrefs(): Promise<NotificationPrefs> {
@@ -135,18 +112,13 @@ export async function getFAQs(): Promise<{ id: string; question: string; answer:
   return data;
 }
 
-export async function createSupportTicket(subject: string, message: string): Promise<any> {
+export async function createSupportTicket(subject: string, message: string): Promise<SupportTicket> {
   const { data } = await apiClient.post("/support/tickets", { subject, message });
   return data;
 }
 
-export async function getDashboard(): Promise<any> {
-  const { data } = await apiClient.get("/home/dashboard");
-  return data;
-}
-
-export async function getDosAndDonts(): Promise<string[]> {
-  const { data } = await apiClient.get("/home/dos-and-donts");
+export async function getSupportTickets(): Promise<SupportTicket[]> {
+  const { data } = await apiClient.get("/support/tickets");
   return data;
 }
 

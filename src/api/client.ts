@@ -1,5 +1,6 @@
 import axios, { AxiosError } from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getToken } from "../utils/tokenStorage";
+import { NO_INTERNET_MESSAGE, SERVER_UNREACHABLE_MESSAGE, isProbablyOnline } from "../utils/network";
 import { Platform, NativeModules } from "react-native";
 
 function getDevServerIP(): string {
@@ -42,10 +43,11 @@ if (__DEV__) {
 
 export const apiClient = axios.create({ baseURL: API_BASE_URL, timeout: 15000 });
 
-export const TOKEN_KEY = "temple-connect-token";
+/** Encodes an id for use as a URL path segment (temple ids can contain ':' or spaces). */
+export const seg = (value: string) => encodeURIComponent(value);
 
 apiClient.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  const token = await getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -59,22 +61,34 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<{ error?: string; message?: string }>) => {
     if (error.response) {
-      if (error.response.status === 401) {
+      // A 401 on an authenticated request means the session ended (expired, password changed, account deleted).
+      const sentToken = !!error.config?.headers?.Authorization;
+      const isAuthCall = (error.config?.url || "").startsWith("/auth/");
+      if (error.response.status === 401 && sentToken && !isAuthCall) {
         forceLogout();
       }
       const msg = error.response.data?.error || error.response.data?.message || `Server error (${error.response.status})`;
       (error as any).friendlyMessage = msg;
-    } else if (error.code === "ECONNABORTED") {
-      (error as any).friendlyMessage = "Request timed out. Check your connection.";
-    } else if (error.message === "Network Error") {
-      (error as any).friendlyMessage = `Cannot connect to ${API_BASE_URL}. Is the backend running?`;
     } else {
-      (error as any).friendlyMessage = error.message || "Unknown error occurred";
+      // No response at all: either the phone is offline or the server is unreachable.
+      (error as any).isNetworkError = true;
+      if (!isProbablyOnline()) {
+        (error as any).friendlyMessage = NO_INTERNET_MESSAGE;
+      } else if (error.code === "ECONNABORTED") {
+        (error as any).friendlyMessage = "The request took too long. Please check your internet connection and try again.";
+      } else {
+        (error as any).friendlyMessage = __DEV__ ? `${SERVER_UNREACHABLE_MESSAGE}
+
+(Dev: cannot reach ${API_BASE_URL} — is the backend running?)` : SERVER_UNREACHABLE_MESSAGE;
+      }
     }
     return Promise.reject(error);
   }
 );
 
+export function isNetworkError(err: any): boolean {
+  return !!err?.isNetworkError;
+}
 
 export function getErrorMessage(err: any): string {
   return err?.friendlyMessage || err?.response?.data?.error || err?.message || "Something went wrong";

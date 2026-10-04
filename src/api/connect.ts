@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, seg } from "./client";
 
 export interface Puja {
   id: string;
@@ -12,8 +12,9 @@ export interface Puja {
 }
 
 export interface PriestPuja {
+  pujaId: string;
   puja: Puja;
-  price?: number;
+  price?: number | null;
 }
 
 export interface Priest {
@@ -31,6 +32,16 @@ export interface Priest {
   bio?: string;
   avatar?: string;
   priestPujas?: PriestPuja[];
+  /** Price for the puja the list was fetched for (getPriestsByPuja only). */
+  price?: number | null;
+}
+
+export interface Review {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  createdAt: string;
+  user?: { name: string };
 }
 
 export interface Booking {
@@ -38,13 +49,17 @@ export interface Booking {
   priestId: string;
   pujaId: string;
   scheduledAt: string;
-  status: string;
+  status: "pending" | "confirmed" | "completed" | "cancelled" | string;
   paid: boolean;
   amount: number;
   notes?: string;
-  priest?: { name: string };
-  puja?: { name: string; icon: string };
+  reviewed?: boolean;
+  priest?: { name: string; userId?: string | null; phone?: string | null };
+  puja?: { name: string; icon: string; duration?: string };
 }
+
+/** Free cancellation window for confirmed bookings (matches the backend rule). */
+export const CANCELLATION_WINDOW_HOURS = 24;
 
 // ── Pujas ─────────────────
 
@@ -61,23 +76,28 @@ export async function listPriests(): Promise<Priest[]> {
 }
 
 export async function getPriestsByPuja(pujaId: string): Promise<Priest[]> {
-  const { data } = await apiClient.get(`/priests/by-puja/${pujaId}`);
+  const { data } = await apiClient.get(`/priests/by-puja/${seg(pujaId)}`);
   return data;
 }
 
-export async function getPriest(id: string): Promise<Priest> {
-  const { data } = await apiClient.get(`/priests/${id}`);
+export async function getPriest(id: string): Promise<Priest & { reviews: Review[] }> {
+  const { data } = await apiClient.get(`/priests/${seg(id)}`);
   return data;
 }
 
-export async function getPriestReviews(priestId: string): Promise<any[]> {
-  const { data } = await apiClient.get(`/priests/${priestId}/reviews`);
+export async function getPriestReviews(priestId: string): Promise<Review[]> {
+  const { data } = await apiClient.get(`/priests/${seg(priestId)}/reviews`);
+  return data;
+}
+
+export async function submitReview(priestId: string, rating: number, comment?: string): Promise<{ newRating: number; reviewCount: number }> {
+  const { data } = await apiClient.post(`/priests/${seg(priestId)}/reviews`, { rating, comment });
   return data;
 }
 
 // ── Bookings ─────────────
 
-export async function listBookings(status?: string): Promise<Booking[]> {
+export async function listBookings(status?: "upcoming" | "past"): Promise<Booking[]> {
   const { data } = await apiClient.get("/bookings", { params: status ? { status } : {} });
   return data;
 }
@@ -88,17 +108,23 @@ export async function createBooking(priestId: string, pujaId: string, scheduledA
 }
 
 export async function getBooking(id: string): Promise<Booking> {
-  const { data } = await apiClient.get(`/bookings/${id}`);
+  const { data } = await apiClient.get(`/bookings/${seg(id)}`);
   return data;
 }
 
 export async function rescheduleBooking(id: string, scheduledAt: string): Promise<Booking> {
-  const { data } = await apiClient.patch(`/bookings/${id}/reschedule`, { scheduledAt });
+  const { data } = await apiClient.patch(`/bookings/${seg(id)}/reschedule`, { scheduledAt });
   return data;
 }
 
 export async function cancelBooking(id: string): Promise<Booking> {
-  const { data } = await apiClient.delete(`/bookings/${id}`);
+  const { data } = await apiClient.delete(`/bookings/${seg(id)}`);
+  return data;
+}
+
+/** Records payment for a confirmed booking (simulated until a payment gateway is integrated). */
+export async function payForBooking(id: string): Promise<Booking> {
+  const { data } = await apiClient.post(`/bookings/${seg(id)}/pay`);
   return data;
 }
 
@@ -109,7 +135,7 @@ export async function getPriestProfile(): Promise<Priest> {
   return data;
 }
 
-export async function updatePriestProfile(profileData: any): Promise<Priest> {
+export async function updatePriestProfile(profileData: Partial<Pick<Priest, "name" | "phone" | "languages" | "bio" | "specialization" | "qualifications" | "experienceYears">> & { pujaIds?: string[] }): Promise<Priest> {
   const { data } = await apiClient.patch("/admin/priest/profile", profileData);
   return data;
 }

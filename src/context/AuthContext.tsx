@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AuthUser, login as loginApi, register as registerApi } from "../api/auth";
-import { TOKEN_KEY, setForceLogout } from "../api/client";
+import { setForceLogout } from "../api/client";
+import { clearToken, getToken, setToken } from "../utils/tokenStorage";
+import { getMe } from "../api/profile";
+import { clearPushToken } from "../api/admin";
+import { forgetPushRegistration } from "../hooks/usePushNotifications";
 
 const USER_KEY = "temple-connect-user";
 
@@ -17,6 +21,8 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Stores a new token/user (e.g. after a password change) or updates the cached profile. */
+  updateSession: (user: AuthUserWithRole, token?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -25,26 +31,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUserWithRole | null>(null);
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.role === "admin";
-  const isPriest = user?.role === "priest" || isAdmin;
+  const isPriest = user?.role === "priest";
+
+  async function clearLocal() {
+    await clearToken();
+    await AsyncStorage.removeItem(USER_KEY);
+    setUser(null);
+  }
 
   useEffect(() => {
     (async () => {
-      const storedUser = await AsyncStorage.getItem(USER_KEY);
-      if (storedUser) setUser(JSON.parse(storedUser));
-      setLoading(false);
+      try {
+        const [token, storedUser] = await Promise.all([getToken(), AsyncStorage.getItem(USER_KEY)]);
+        if (!token) { await clearLocal(); return; }
+        if (storedUser) setUser(JSON.parse(storedUser));
+        // Validate the session and pick up role/name changes made on the server.
+        try {
+          const me = await getMe();
+          await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
+          setUser(me);
+        } catch (err: any) {
+          if (err?.response?.status === 401) await clearLocal();
+          // Network errors keep the cached user so the app still opens offline.
+        }
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
-  async function persist(token: string, authUser: any) {
-    await AsyncStorage.setItem(TOKEN_KEY, token);
+  async function persist(token: string, authUser: AuthUserWithRole) {
+    await setToken(token);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(authUser));
     setUser(authUser);
   }
 
-  // Use a ref so forceLogout always calls the latest signOut without re-registering
-  const signOutRef = useRef<() => Promise<void>>(async () => {
-    await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
-    setUser(null);
+  // Ref so forceLogout (registered once) always runs the latest logic.
+  const signOutRef = useRef(async (notifyServer: boolean) => {
+    if (notifyServer) {
+      // Stop push notifications for this account on this device.
+      try { await clearPushToken(); } catch {}
+    }
+    await forgetPushRegistration();
+    await clearLocal();
   });
 
   const value = useMemo<AuthContextValue>(
@@ -54,25 +83,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin,
       isPriest,
       signIn: async (email, password) => {
-        const res = await loginApi(email, password);
+        const res = await loginApi(email.trim(), password);
         await persist(res.token, res.user);
       },
       signUp: async (name, email, password) => {
-        const res = await registerApi(name, email, password);
+        const res = await registerApi(name.trim(), email.trim(), password);
         await persist(res.token, res.user);
       },
       signOut: async () => {
-        await signOutRef.current();
+        await signOutRef.current(true);
+      },
+      updateSession: async (nextUser, token) => {
+        if (token) await setToken(token);
+        await AsyncStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+        setUser(nextUser);
       },
     }),
     [user, loading, isAdmin, isPriest]
   );
 
-  // Register forceLogout once — the ref ensures it always uses the latest signOut
   useEffect(() => {
-    setForceLogout(() => {
-      signOutRef.current();
-    });
+    // The session is already invalid server-side, so skip the server call.
+    setForceLogout(() => { signOutRef.current(false); });
   }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

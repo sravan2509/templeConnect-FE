@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   primary: { backgroundColor: colors.primary },
   secondary: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.primary },
   disabled: { opacity: 0.5 },
-  text: { fontSize: 16, fontWeight: "600" },
+  text: { fontSize: 16, fontWeight: "600", textAlign: "center" },
   textPrimary: { color: colors.bg },
   textSecondary: { color: colors.primary },
 });

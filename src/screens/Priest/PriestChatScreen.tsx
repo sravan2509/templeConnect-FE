@@ -1,178 +1,105 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { colors, spacing, radius } from "../../theme";
-import { Screen } from "../../components/Screen";
-import { Button } from "../../components/Button";
-import { getChatUsers, getMessages, sendMessage, markChatRead } from "../../api/admin";
+import { colors, radius, spacing } from "../../theme";
+import { ChatUser, getChatUsers } from "../../api/admin";
+import { getErrorMessage } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
+import { ChatThread } from "../../components/ChatThread";
 
-export default function PriestChatScreen() {
+export default function PriestChatScreen({ route, navigation }: any) {
   const { user } = useAuth();
-  const [users, setUsers] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<any | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [text, setText] = useState("");
+  const insets = useSafeAreaInsets();
+  // iOS keyboard avoidance needs the distance from the screen top to the thread (status bar + header).
+  const HEADER_HEIGHT = 57;
+  const [users, setUsers] = useState<ChatUser[]>([]);
+  const [selected, setSelected] = useState<ChatUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const scrollRef = useRef<ScrollView>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      (async () => {
-        try {
-          const fetchedUsers = await getChatUsers();
-          if (isActive) {
-            setUsers(fetchedUsers);
-            setLoading(false);
-          }
-        } catch {
-          if (isActive) setLoading(false);
-        }
-      })();
-      return () => { isActive = false; };
-    }, [])
-  );
-
-  useEffect(() => {
-    if (!selectedUser) return;
-    let isActive = true;
-    const fetchMsgs = async () => {
-      try {
-        const msgs = await getMessages(selectedUser.id);
-        if (isActive) {
-          setMessages(msgs);
-        }
-        // Mark as read when messages are fetched
-        await markChatRead(selectedUser.id);
-      } catch {}
-    };
-    fetchMsgs();
-    const interval = setInterval(fetchMsgs, 3000);
-    return () => { isActive = false; clearInterval(interval); };
-  }, [selectedUser]);
-
-  const handleSend = async () => {
-    if (!text.trim() || !selectedUser) return;
-    const currentText = text;
-    setText("");
+  const load = useCallback(async () => {
     try {
-      const msg = await sendMessage(selectedUser.id, currentText);
-      setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch {}
-  };
+      setUsers(await getChatUsers());
+      setError(null);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  if (selectedUser) {
+  useFocusEffect(useCallback(() => { if (!selected) load(); }, [load, selected]));
+
+  // Opened from a booking card: jump straight into that devotee's conversation.
+  const openUser = route?.params?.openUser;
+  useEffect(() => {
+    if (openUser?.id) {
+      setSelected({ id: openUser.id, name: openUser.name ?? "Devotee", unreadCount: 0, lastMessageAt: null });
+      navigation?.setParams({ openUser: undefined });
+    }
+  }, [openUser?.id]);
+
+  if (selected) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSelectedUser(null)}>
-            <Text style={styles.backBtn}>⬅ Back</Text>
+          <TouchableOpacity onPress={() => { setSelected(null); load(); }} hitSlop={12}>
+            <Text style={styles.backBtn}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{selectedUser.name}</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>{selected.name}</Text>
           <View style={{ width: 50 }} />
         </View>
-        <ScrollView 
-          ref={scrollRef}
-          contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
-        >
-          {messages.map((m, i) => {
-            const isMe = m.fromUserId === user?.id;
-            return (
-              <View key={i} style={[styles.msgWrap, isMe ? styles.msgMeWrap : styles.msgThemWrap]}>
-                <View style={[styles.msgBubble, isMe ? styles.msgMe : styles.msgThem]}>
-                  <Text style={[styles.msgText, isMe ? styles.msgMeText : styles.msgThemText]}>{m.text}</Text>
-                  <View style={styles.msgFooter}>
-                    <Text style={[styles.msgTime, isMe ? styles.msgMeTime : styles.msgThemTime]}>
-                      {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                    {isMe && (
-                      <Text style={[styles.msgStatus, { color: m.read ? "#87CEEB" : "rgba(255,255,255,0.7)" }]}>
-                        {m.read ? " ✓✓" : " ✓"}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-        <View style={styles.inputArea}>
-          <TextInput 
-            style={styles.input} 
-            value={text} 
-            onChangeText={setText} 
-            placeholder="Type a message..." 
-            placeholderTextColor={colors.textMuted}
-          />
-          <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
-            <Text style={styles.sendBtnText}>Send</Text>
-          </TouchableOpacity>
-        </View>
+        <ChatThread otherUserId={selected.id} myUserId={user?.id} placeholder="Type a message..." keyboardOffset={insets.top + HEADER_HEIGHT} />
       </SafeAreaView>
     );
   }
 
   return (
-    <Screen>
-      <View style={styles.headerFlat}>
-        <Text style={styles.headerTitle}>💬 Chat</Text>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>💬 Chats</Text>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {loading && <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />}
-        {!loading && users.length === 0 && (
-          <Text style={styles.empty}>You have no recent chats.</Text>
-        )}
-        {!loading && users.map((u, i) => (
-          <TouchableOpacity key={i} style={styles.userCard} onPress={() => setSelectedUser(u)}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={styles.userName}>{u.name}</Text>
-              {u.unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadBadgeText}>{u.unreadCount}</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.sub}>Tap to view messages</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </Screen>
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      ) : (
+        <FlatList
+          data={users}
+          keyExtractor={(u) => u.id}
+          contentContainerStyle={{ padding: spacing.md }}
+          refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
+          ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
+          ListEmptyComponent={<Text style={styles.empty}>No chats yet. Devotees with bookings will appear here.</Text>}
+          renderItem={({ item: u }) => (
+            <TouchableOpacity style={styles.userCard} onPress={() => setSelected(u)}>
+              <View style={styles.row}>
+                <Text style={styles.userName}>{u.name}</Text>
+                {u.unreadCount > 0 && (
+                  <View style={styles.badge}><Text style={styles.badgeText}>{u.unreadCount}</Text></View>
+                )}
+              </View>
+              <Text style={styles.sub}>
+                {u.lastMessageAt ? `Last message ${new Date(u.lastMessageAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}` : "No messages yet"}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerFlat: { padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: spacing.md },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.md, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerTitle: { color: colors.primary, fontSize: 18, fontWeight: "700" },
-  backBtn: { color: colors.primary, fontWeight: "600" },
-  empty: { color: colors.textMuted, textAlign: "center", marginTop: spacing.xl },
-  userCard: { backgroundColor: colors.card, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.md, paddingVertical: spacing.md, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border },
+  headerTitle: { color: colors.text, fontSize: 18, fontWeight: "700", flexShrink: 1 },
+  backBtn: { color: colors.primary, fontSize: 16, fontWeight: "600" },
+  userCard: { backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.sm },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   userName: { color: colors.text, fontSize: 16, fontWeight: "700" },
-  sub: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs },
-  unreadBadge: { backgroundColor: colors.danger, borderRadius: 12, minWidth: 24, height: 24, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
-  unreadBadgeText: { color: "#fff", fontSize: 12, fontWeight: "800" },
-  
-  msgWrap: { flexDirection: "row", marginBottom: spacing.sm },
-  msgMeWrap: { justifyContent: "flex-end" },
-  msgThemWrap: { justifyContent: "flex-start" },
-  msgBubble: { maxWidth: "80%", padding: spacing.md, borderRadius: radius.md },
-  msgMe: { backgroundColor: colors.primary, borderBottomRightRadius: 0 },
-  msgThem: { backgroundColor: colors.card, borderBottomLeftRadius: 0, borderWidth: 1, borderColor: colors.border },
-  msgText: { fontSize: 15 },
-  msgMeText: { color: "#fff" },
-  msgThemText: { color: colors.text },
-  msgFooter: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 4 },
-  msgTime: { fontSize: 10 },
-  msgMeTime: { color: "rgba(255,255,255,0.7)" },
-  msgThemTime: { color: colors.textMuted },
-  msgStatus: { fontSize: 10, marginLeft: 4 },
-  
-  inputArea: { flexDirection: "row", padding: spacing.md, backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border, alignItems: "center" },
-  input: { flex: 1, backgroundColor: colors.bg, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, marginRight: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  sendBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 999 },
-  sendBtnText: { color: "#fff", fontWeight: "700" }
+  sub: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+  badge: { backgroundColor: colors.danger, borderRadius: 10, minWidth: 20, height: 20, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  badgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  empty: { color: colors.textMuted, textAlign: "center", marginTop: spacing.xl },
+  error: { color: colors.danger, marginBottom: spacing.sm },
 });

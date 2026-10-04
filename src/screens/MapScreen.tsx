@@ -1,71 +1,73 @@
-import { useEffect, useState, useRef } from "react";
-import { ScrollView, StyleSheet, Text, View, Platform, Dimensions } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker } from "react-native-maps";
-import { Screen } from "../components/Screen";
-import { Card } from "../components/Card";
-import { SectionHeader } from "../components/SectionHeader";
-import { colors, spacing, radius } from "../theme";
+import { colors, spacing } from "../theme";
 import { getMapTemples, MapTemple } from "../api/admin";
+import { getErrorMessage } from "../api/client";
 
-export default function MapScreen({ route }: any) {
+export default function MapScreen({ route, navigation }: any) {
+  const focus: { lat?: number; lng?: number; name?: string } = route.params ?? {};
+  const hasFocus = typeof focus.lat === "number" && typeof focus.lng === "number";
   const [temples, setTemples] = useState<MapTemple[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     (async () => {
-      try { 
-        const data = await getMapTemples();
+      try {
+        const data = await getMapTemples(hasFocus ? { lat: focus.lat, lng: focus.lng } : undefined);
         setTemples(data);
-        if (data.length > 0 && mapRef.current) {
-          mapRef.current.fitToCoordinates(
-            data.map(t => ({ latitude: t.lat, longitude: t.lng })),
-            { edgePadding: { top: 50, right: 50, bottom: 50, left: 50 }, animated: true }
-          );
+        // Only zoom out to show everything when we're not focused on a specific temple.
+        if (!hasFocus && data.length > 0) {
+          setTimeout(() => mapRef.current?.fitToCoordinates(
+            data.map((t) => ({ latitude: t.lat, longitude: t.lng })),
+            { edgePadding: { top: 60, right: 60, bottom: 60, left: 60 }, animated: true }
+          ), 300);
         }
-      } catch {} finally { setLoading(false); }
+      } catch (e) {
+        setError(getErrorMessage(e));
+      } finally {
+        setLoading(false);
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Use route params to center map if navigated from a specific temple
   const initialRegion = {
-    latitude: route.params?.lat || 20.5937,
-    longitude: route.params?.lng || 78.9629,
-    latitudeDelta: route.params?.lat ? 0.05 : 15,
-    longitudeDelta: route.params?.lng ? 0.05 : 15,
+    latitude: hasFocus ? focus.lat! : 20.5937,
+    longitude: hasFocus ? focus.lng! : 78.9629,
+    latitudeDelta: hasFocus ? 0.05 : 20,
+    longitudeDelta: hasFocus ? 0.05 : 20,
   };
 
+  const focusIsListed = hasFocus && temples.some((t) => Math.abs(t.lat - focus.lat!) < 1e-4 && Math.abs(t.lng - focus.lng!) < 1e-4);
+
   return (
-    <Screen scroll={false}>
-      <View style={styles.container}>
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          initialRegion={initialRegion}
-          showsUserLocation={true}
-        >
-          {temples.map((t) => (
-            <Marker
-              key={t.id}
-              coordinate={{ latitude: t.lat, longitude: t.lng }}
-              title={t.name}
-              description={`${t.city}, ${t.state}`}
-            />
-          ))}
-        </MapView>
-      </View>
-    </Screen>
+    <View style={styles.container}>
+      <MapView ref={mapRef} style={StyleSheet.absoluteFill} initialRegion={initialRegion} showsUserLocation>
+        {hasFocus && !focusIsListed && (
+          <Marker coordinate={{ latitude: focus.lat!, longitude: focus.lng! }} title={focus.name} pinColor={colors.primary} />
+        )}
+        {temples.map((t) => (
+          <Marker
+            key={t.id}
+            coordinate={{ latitude: t.lat, longitude: t.lng }}
+            title={t.name}
+            description={[t.city, t.state].filter(Boolean).join(", ")}
+            pinColor={hasFocus && Math.abs(t.lat - focus.lat!) < 1e-4 ? colors.primary : undefined}
+            onCalloutPress={() => navigation.navigate("TempleDetail", { temple: { name: t.name, placeId: t.id, city: t.city, state: t.state } })}
+          />
+        ))}
+      </MapView>
+      {loading && <ActivityIndicator style={styles.overlay} color={colors.primary} />}
+      {error && <Text style={[styles.overlay, styles.error]}>{error}</Text>}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    borderRadius: radius.md,
-    overflow: "hidden",
-  },
-  map: {
-    width: "100%",
-    height: "100%",
-  }
+  container: { flex: 1, backgroundColor: colors.bg },
+  overlay: { position: "absolute", top: spacing.md, alignSelf: "center" },
+  error: { backgroundColor: colors.card, color: colors.danger, padding: spacing.sm, borderRadius: 8, overflow: "hidden" },
 });

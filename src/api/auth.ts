@@ -22,7 +22,8 @@ export async function register(name: string, email: string, password: string): P
   return data;
 }
 
-export async function forgotPassword(email: string): Promise<{ message: string, code: string }> {
+/** `devCode` is only present when the backend runs with DEV_EXPOSE_RESET_CODE=true. */
+export async function forgotPassword(email: string): Promise<{ message: string; devCode?: string }> {
   const { data } = await apiClient.post("/auth/forgot-password", { email });
   return data;
 }
@@ -32,7 +33,10 @@ export async function resetPassword(email: string, token: string, newPassword: s
   return data;
 }
 
-export async function changePassword(oldPassword: string, newPassword: string): Promise<{ message: string }> {
+/** Other sessions are signed out; the returned token replaces this device's token. */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<{ message: string } & AuthResponse> {
   const { data } = await apiClient.post("/auth/change-password", { oldPassword, newPassword });
   return data;
 }
+
+export const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());

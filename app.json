@@ -1,13 +1,22 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Temple Connect",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FBF3EA"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.templeconnect.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Temple Connect uses your location to show temples and events near you."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,11 +26,18 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobile"
+      "package": "com.templeconnect.app",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "POST_NOTIFICATIONS"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "Temple Connect uses your location to show temples and events near you." }
+      ],
+      "expo-notifications"
+    ]
   }
 }

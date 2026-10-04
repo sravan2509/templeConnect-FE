@@ -1,144 +1,230 @@
-import { useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { SectionHeader } from "../components/SectionHeader";
+import { TextField } from "../components/TextField";
+import { BookingCard } from "../components/BookingCard";
+import { SlotPicker, Slot, firstAvailableSlot, slotToISO } from "../components/SlotPicker";
 import { colors, spacing, radius } from "../theme";
-import { listPujas, getPriestsByPuja, createBooking, listBookings, cancelBooking, getPriestReviews, Priest, Puja, Booking } from "../api/connect";
-import { submitReview } from "../api/admin";
+import { listPujas, getPriestsByPuja, createBooking, listBookings, getPriestReviews, Priest, Puja, Booking, Review } from "../api/connect";
 import { getErrorMessage } from "../api/client";
+import { formatDate, formatDateTime, formatPrice } from "../utils/format";
 
 type Step = "pujas" | "priests" | "book" | "bookings";
-const LANGUAGES = ["All", "Hindi", "English", "Telugu", "Tamil", "Sanskrit", "Kannada", "Marathi", "Gujarati"];
+const LANGUAGES = ["All", "Hindi", "English", "Telugu", "Tamil", "Sanskrit", "Kannada", "Marathi", "Gujarati", "Punjabi"];
+const STEP_LABELS: Record<Step, string> = { pujas: "1. Puja", priests: "2. Priest", book: "3. Confirm", bookings: "My Bookings" };
 
-export default function BookPujaScreen() {
-  const [step, setStep] = useState<Step>("pujas");
+export default function BookPujaScreen({ route }: any) {
+  const [step, setStep] = useState<Step>(route.params?.step === "bookings" ? "bookings" : "pujas");
   const [pujas, setPujas] = useState<Puja[]>([]);
-  const [fpujas, setFpujas] = useState<Puja[]>([]);
   const [pq, setPq] = useState("");
   const [selPuja, setSelPuja] = useState<Puja | null>(null);
   const [priests, setPriests] = useState<Priest[]>([]);
-  const [fpriests, setFpriests] = useState<Priest[]>([]);
   const [selPriest, setSelPriest] = useState<Priest | null>(null);
   const [lang, setLang] = useState("All");
-  const [rating, setRating] = useState(0);
+  const [minRating, setMinRating] = useState(0);
   const [showLang, setShowLang] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [slot, setSlot] = useState<Slot>(firstAvailableSlot);
+  const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selDate, setSelDate] = useState(new Date());
-  const [selHour, setSelHour] = useState(10);
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [booking, setBooking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { loadPujas(); loadBookings(); }, []);
-  async function loadPujas() { try { const p = await listPujas(); setPujas(p); setFpujas(p); } catch {} }
-  async function loadBookings() { try { setBookings(await listBookings()); } catch {} }
+  const loadPujas = useCallback(async () => {
+    try { setPujas(await listPujas()); setError(null); } catch (e) { setError(getErrorMessage(e)); }
+  }, []);
+  const loadBookings = useCallback(async () => {
+    try { setBookings(await listBookings()); } catch (e) { setError(getErrorMessage(e)); }
+  }, []);
 
-  useEffect(() => { setFpujas(pq ? pujas.filter(p => p.name.toLowerCase().includes(pq.toLowerCase())) : pujas); }, [pq, pujas]);
-  useEffect(() => {
-    let l = [...priests];
-    if (lang !== "All") l = l.filter(p => p.languages.toLowerCase().includes(lang.toLowerCase()));
-    if (rating > 0) l = l.filter(p => p.rating >= rating);
-    setFpriests(l);
-  }, [lang, rating, priests]);
+  useEffect(() => { loadPujas(); }, [loadPujas]);
+  useFocusEffect(useCallback(() => { loadBookings(); }, [loadBookings]));
 
-  async function selectPuja(p: Puja) { setSelPuja(p); setLoading(true); try { const pr = await getPriestsByPuja(p.id); setPriests(pr); setFpriests(pr); setStep("priests"); } catch {} setLoading(false); }
-  function selectPriest(p: Priest) { setSelPriest(p); setStep("book"); }
-  function getISO() { const d = new Date(selDate); d.setHours(selHour, 0, 0, 0); return d.toISOString(); }
+  const filteredPujas = useMemo(
+    () => (pq ? pujas.filter((p) => `${p.name} ${p.category} ${p.description ?? ""}`.toLowerCase().includes(pq.toLowerCase())) : pujas),
+    [pq, pujas]
+  );
+  const filteredPriests = useMemo(
+    () => priests.filter((p) => (lang === "All" || p.languages.toLowerCase().includes(lang.toLowerCase())) && p.rating >= minRating),
+    [priests, lang, minRating]
+  );
+
+  async function selectPuja(p: Puja) {
+    setSelPuja(p); setSelPriest(null); setLoading(true); setError(null);
+    try { setPriests(await getPriestsByPuja(p.id)); setStep("priests"); }
+    catch (e) { Alert.alert("Error", getErrorMessage(e)); }
+    finally { setLoading(false); }
+  }
+
+  async function selectPriest(p: Priest) {
+    setSelPriest(p); setSlot(firstAvailableSlot()); setNotes(""); setReviews([]); setStep("book");
+    try { setReviews(await getPriestReviews(p.id)); } catch {}
+  }
 
   async function handleBook() {
     if (!selPriest || !selPuja) return;
-    try { await createBooking(selPriest.id, selPuja.id, getISO()); Alert.alert("Booked!", `Pending confirmation from priest.`); setStep("bookings"); loadBookings(); }
-    catch (e: any) { Alert.alert("Error", getErrorMessage(e)); }
+    setBooking(true);
+    try {
+      await createBooking(selPriest.id, selPuja.id, slotToISO(slot), notes.trim() || undefined);
+      Alert.alert("Booking requested 🙏", `${selPriest.name} will confirm your ${selPuja.name}. You'll get a notification once it's confirmed.`);
+      setSelPuja(null); setSelPriest(null);
+      setStep("bookings");
+      loadBookings();
+    } catch (e) {
+      Alert.alert("Could not book", getErrorMessage(e));
+    } finally { setBooking(false); }
   }
 
-  async function handleReschedule(bid: string) {
-    Alert.alert("Reschedule", "Cancel current booking and create a new one. Select date/time again.", [
-      { text: "Cancel" },
-      { text: "Proceed", onPress: async () => {
-        await cancelBooking(bid);
-        setStep("pujas"); setSelPuja(null); setSelPriest(null);
-        loadBookings();
-      }},
-    ]);
-  }
+  const price = selPriest?.price ?? selPuja?.basePrice ?? 0;
+  const canGoTo = (s: Step) => s === "pujas" || s === "bookings" || (s === "priests" && !!selPuja) || (s === "book" && !!selPriest);
+  const upcoming = bookings.filter((b) => b.status === "pending" || b.status === "confirmed");
+  const past = bookings.filter((b) => b.status !== "pending" && b.status !== "confirmed");
 
-  async function handleCancel(bid: string) {
-    Alert.alert("Cancel Booking", "Are you sure?", [
-      { text: "No" },
-      { text: "Yes, Cancel", style: "destructive", onPress: async () => {
-        try { await cancelBooking(bid); loadBookings(); } catch (e: any) { Alert.alert("Error", getErrorMessage(e)); }
-      }},
-    ]);
-  }
-
-  async function handleReview(bid: string, pid: string) {
-    try { await submitReview(pid, 5); Alert.alert("Thanks!", "Review submitted."); loadBookings(); }
-    catch (e: any) { Alert.alert("Error", getErrorMessage(e)); }
-  }
-
-  function renderDateGrid() {
-    const dates = [];
-    for (let i = 0; i < 14; i++) { const d = new Date(); d.setDate(d.getDate() + i); dates.push(d); }
-    return (
-      <View style={styles.dateGrid}>
-        <Text style={styles.label}>Date</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {dates.map((d, i) => { const is = d.toDateString() === selDate.toDateString(); return <TouchableOpacity key={i} style={[styles.dChip, is && styles.dChipA]} onPress={() => setSelDate(d)}><Text style={[styles.dChipT, is && styles.dChipTA]}>{d.getDate()}/{d.getMonth() + 1}</Text></TouchableOpacity>; })}
-        </ScrollView>
-        <Text style={[styles.label, { marginTop: spacing.sm }]}>Time</Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-          {[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].map(h => { const a = selHour === h; return <TouchableOpacity key={h} style={[styles.chip, a && styles.chipA]} onPress={() => setSelHour(h)}><Text style={[styles.chipT, a && styles.chipTA]}>{h}:00</Text></TouchableOpacity>; })}
-        </View>
-      </View>
-    );
-  }
-
-  if (loading) return <Screen><Text style={styles.loading}>Loading...</Text></Screen>;
-  const steps: Step[] = ["pujas", "priests", "book", "bookings"];
   return (
-    <Screen scroll={false}>
-      <View style={styles.stepRow}>{steps.map(s => <TouchableOpacity key={s} onPress={() => { if (s !== "book" || selPriest) setStep(s); }}><Text style={[styles.stepL, step === s && styles.stepLA]}>{s === "pujas" ? "1.Puja" : s === "priests" ? "2.Priest" : s === "book" ? "3.Confirm" : "Bookings"}</Text></TouchableOpacity>)}</View>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {step === "pujas" && (<><SectionHeader title="Select Puja" /><TextInput style={styles.input} value={pq} onChangeText={setPq} placeholder="Search pujas..." placeholderTextColor={colors.textMuted} />{fpujas.map(p => <TouchableOpacity key={p.id} onPress={() => selectPuja(p)}><Card><Text style={styles.name}>{p.icon} {p.name}</Text><Text style={styles.sub}>₹{p.basePrice} · {p.duration}</Text></Card></TouchableOpacity>)}</>)}
-        {step === "priests" && selPuja && (<><SectionHeader title={`Priests: ${selPuja.name}`} /><Button title="← Back" variant="secondary" onPress={() => setStep("pujas")} style={{ marginBottom: spacing.sm }} /><TouchableOpacity style={styles.fBtn} onPress={() => setShowLang(true)}><Text>🗣️ {lang}</Text></TouchableOpacity><Modal visible={showLang} transparent animationType="slide"><View style={styles.modalO}><View style={styles.modalB}>{LANGUAGES.map(l => <TouchableOpacity key={l} style={[styles.modalI, lang === l && styles.modalIA]} onPress={() => { setLang(l); setShowLang(false); }}><Text style={[styles.modalIT, lang === l && styles.modalITA]}>{l}</Text></TouchableOpacity>)}<Button title="Close" variant="secondary" onPress={() => setShowLang(false)} /></View></View></Modal><View style={styles.chipRow}>{[0, 3, 4, 4.5].map(r => <TouchableOpacity key={r} style={[styles.chip, rating === r && styles.chipA]} onPress={() => setRating(rating === r ? 0 : r)}><Text style={[styles.chipT, rating === r && styles.chipTA]}>⭐{r === 0 ? "All" : r + "+"}</Text></TouchableOpacity>)}</View>{fpriests.map(p => <TouchableOpacity key={p.id} onPress={() => selectPriest(p)}><Card><Text style={styles.name}>{p.verified ? "✅ " : ""}{p.name} ⭐{p.rating}</Text><Text style={styles.sub}>{p.languages} · {p.experienceYears}yrs</Text></Card></TouchableOpacity>)}</>)}
-        {step === "book" && selPriest && selPuja && (<>
-          <Card><Text style={styles.name}>{selPuja.icon} {selPuja.name} · ₹{selPuja.basePrice}</Text></Card>
-          <Card><Text style={styles.name}>🧑‍🦱 {selPriest.name} ⭐{selPriest.rating}</Text><Text style={styles.sub}>{selPriest.languages} · {selPriest.experienceYears}yrs</Text></Card>
-          {reviews.length > 0 && <Card><Text style={styles.name}>Reviews ({reviews.length})</Text>{reviews.map((r: any, i: number) => <Text key={r.id || i} style={styles.sub}>⭐{r.rating} - {r.comment || r.user?.name}</Text>)}</Card>}
-          {renderDateGrid()}<Button title="Confirm Booking" onPress={handleBook} style={{ marginTop: spacing.md }} /></>)}
-        {step === "bookings" && (<><SectionHeader title="My Bookings" />{bookings.length === 0 ? <Text style={styles.empty}>No bookings.</Text> : bookings.map(b => <Card key={b.id}><Text style={styles.name}>{b.puja?.icon} {b.puja?.name}</Text><Text style={styles.sub}>Priest: {b.priest?.name}</Text><Text style={styles.sub}>{new Date(b.scheduledAt).toLocaleString()}</Text><Text style={[styles.status, b.status === "confirmed" && { color: colors.success }, b.status === "cancelled" && { color: colors.danger }]}>{b.status.toUpperCase()}</Text>{b.status === "pending" || b.status === "confirmed" ? <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}><Button title="Cancel" variant="secondary" onPress={() => handleCancel(b.id)} style={{ flex: 1 }} /></View> : null}{b.status === "completed" ? <Button title="⭐ Leave Review" variant="secondary" onPress={() => handleReview(b.id, b.priestId)} style={{ marginTop: spacing.sm }} /> : null}</Card>)}<Button title="Book Another" onPress={() => { setStep("pujas"); setSelPuja(null); setSelPriest(null); }} style={{ marginTop: spacing.md }} /></>)}
-      </ScrollView>
-    </Screen>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={styles.stepRow}>
+        {(Object.keys(STEP_LABELS) as Step[]).map((s) => (
+          <TouchableOpacity key={s} disabled={!canGoTo(s)} onPress={() => setStep(s)} style={[styles.stepBtn, step === s && styles.stepBtnActive]}>
+            <Text style={[styles.stepL, step === s && styles.stepLA, !canGoTo(s) && { opacity: 0.4 }]}>{STEP_LABELS[s]}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Screen safeBottom={false}>
+        {error && <Text style={styles.error}>{error}</Text>}
+        {loading && <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />}
+
+        {step === "pujas" && (
+          <>
+            <SectionHeader title="Select a Puja" />
+            <TextInput style={styles.input} value={pq} onChangeText={setPq} placeholder="Search pujas..." placeholderTextColor={colors.textMuted} />
+            {filteredPujas.length === 0 && !error && <Text style={styles.empty}>No pujas match your search.</Text>}
+            {filteredPujas.map((p) => (
+              <TouchableOpacity key={p.id} onPress={() => selectPuja(p)} disabled={loading}>
+                <Card>
+                  <Text style={styles.name}>{p.icon} {p.name}</Text>
+                  {p.description ? <Text style={styles.sub}>{p.description}</Text> : null}
+                  <Text style={styles.sub}>From {formatPrice(p.basePrice)} · {p.duration}</Text>
+                </Card>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
+        {step === "priests" && selPuja && (
+          <>
+            <SectionHeader title={`Priests for ${selPuja.name}`} />
+            <View style={styles.filterRow}>
+              <TouchableOpacity style={styles.fBtn} onPress={() => setShowLang(true)}>
+                <Text style={styles.fBtnText}>🗣️ {lang} ▾</Text>
+              </TouchableOpacity>
+              {[0, 4, 4.5].map((r) => (
+                <TouchableOpacity key={r} style={[styles.chip, minRating === r && styles.chipA]} onPress={() => setMinRating(r)}>
+                  <Text style={[styles.chipT, minRating === r && styles.chipTA]}>⭐ {r === 0 ? "All" : `${r}+`}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {filteredPriests.length === 0 && (
+              <Text style={styles.empty}>{priests.length === 0 ? "No priests offer this puja yet. Please choose another puja." : "No priests match these filters."}</Text>
+            )}
+            {filteredPriests.map((p) => (
+              <TouchableOpacity key={p.id} onPress={() => selectPriest(p)}>
+                <Card>
+                  <Text style={styles.name}>{p.verified ? "✅ " : ""}{p.name}</Text>
+                  <Text style={styles.sub}>⭐ {p.rating.toFixed(1)} ({p.reviewCount} reviews) · {p.experienceYears} yrs experience</Text>
+                  <Text style={styles.sub}>🗣 {p.languages || "—"}</Text>
+                  <Text style={styles.price}>{formatPrice(p.price ?? selPuja.basePrice)}</Text>
+                </Card>
+              </TouchableOpacity>
+            ))}
+            <Modal visible={showLang} transparent animationType="fade" onRequestClose={() => setShowLang(false)}>
+              <View style={styles.modalO}>
+                <View style={styles.modalB}>
+                  {LANGUAGES.map((l) => (
+                    <TouchableOpacity key={l} style={[styles.modalI, lang === l && styles.modalIA]} onPress={() => { setLang(l); setShowLang(false); }}>
+                      <Text style={[styles.modalIT, lang === l && styles.modalITA]}>{l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </Modal>
+          </>
+        )}
+
+        {step === "book" && selPriest && selPuja && (
+          <>
+            <SectionHeader title="Confirm Booking" />
+            <Card>
+              <Text style={styles.name}>{selPuja.icon} {selPuja.name}</Text>
+              <Text style={styles.sub}>{selPuja.duration}</Text>
+              <Text style={styles.price}>{formatPrice(price)}</Text>
+            </Card>
+            <Card>
+              <Text style={styles.name}>{selPriest.verified ? "✅ " : ""}{selPriest.name}</Text>
+              <Text style={styles.sub}>⭐ {selPriest.rating.toFixed(1)} ({selPriest.reviewCount}) · {selPriest.languages}</Text>
+              {selPriest.bio ? <Text style={[styles.sub, { marginTop: spacing.xs }]}>{selPriest.bio}</Text> : null}
+              {reviews.length > 0 && (
+                <View style={{ marginTop: spacing.sm }}>
+                  <Text style={styles.label}>Recent reviews</Text>
+                  {reviews.slice(0, 3).map((r) => (
+                    <Text key={r.id} style={styles.sub}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)} {r.comment ? `“${r.comment}”` : ""} — {r.user?.name ?? "Devotee"}, {formatDate(r.createdAt)}</Text>
+                  ))}
+                </View>
+              )}
+            </Card>
+            <SlotPicker value={slot} onChange={setSlot} />
+            <TextField label="Notes for the priest (optional)" value={notes} onChangeText={setNotes} multiline maxLength={500} placeholder="Address, family names, special requests..." />
+            <Text style={styles.sub}>Requested time: {formatDateTime(slotToISO(slot))}</Text>
+            <Button title="Request Booking" onPress={handleBook} loading={booking} style={{ marginTop: spacing.md }} />
+            <Text style={styles.hint}>The priest confirms your request. You can pay and chat with them once it's confirmed.</Text>
+          </>
+        )}
+
+        {step === "bookings" && (
+          <>
+            <SectionHeader title="Upcoming" />
+            {upcoming.length === 0 && <Text style={styles.empty}>No upcoming bookings.</Text>}
+            {upcoming.map((b) => <BookingCard key={b.id} booking={b} onChanged={loadBookings} />)}
+            {past.length > 0 && <SectionHeader title="Past" />}
+            {past.map((b) => <BookingCard key={b.id} booking={b} onChanged={loadBookings} />)}
+            <Button title="Book Another Puja" onPress={() => { setStep("pujas"); setSelPuja(null); setSelPriest(null); }} style={{ marginTop: spacing.md }} />
+          </>
+        )}
+      </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stepRow: { flexDirection: "row", justifyContent: "space-around", marginBottom: spacing.sm, paddingVertical: spacing.xs, backgroundColor: colors.cardAlt, borderRadius: radius.md },
-  stepL: { color: colors.textMuted, fontSize: 11, fontWeight: "600" },
+  stepRow: { flexDirection: "row", justifyContent: "space-around", marginHorizontal: spacing.md, marginTop: spacing.sm, padding: 4, backgroundColor: colors.cardAlt, borderRadius: radius.md },
+  stepBtn: { paddingVertical: spacing.xs + 2, paddingHorizontal: spacing.sm, borderRadius: radius.sm },
+  stepBtnActive: { backgroundColor: colors.card },
+  stepL: { color: colors.textMuted, fontSize: 12, fontWeight: "600" },
   stepLA: { color: colors.primary },
-  input: { backgroundColor: colors.cardAlt, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, color: colors.text, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, marginBottom: spacing.sm },
+  input: { backgroundColor: colors.cardAlt, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, color: colors.text, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, fontSize: 14, marginBottom: spacing.sm },
   name: { color: colors.text, fontSize: 15, fontWeight: "700" },
-  sub: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  loading: { color: colors.textMuted, textAlign: "center", marginTop: spacing.xl },
-  empty: { color: colors.textMuted, textAlign: "center", marginTop: spacing.md },
-  chipRow: { flexDirection: "row", gap: 6, marginBottom: spacing.sm },
+  sub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  price: { color: colors.primaryDark, fontSize: 15, fontWeight: "800", marginTop: spacing.xs },
+  label: { color: colors.textMuted, fontSize: 12, textTransform: "uppercase", marginBottom: 2 },
+  hint: { color: colors.textMuted, fontSize: 12, textAlign: "center", marginTop: spacing.sm },
+  empty: { color: colors.textMuted, textAlign: "center", marginVertical: spacing.md },
+  error: { color: colors.danger, marginVertical: spacing.sm },
+  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: spacing.sm, alignItems: "center" },
+  fBtn: { paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs + 2, borderRadius: radius.sm, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  fBtnText: { color: colors.text, fontSize: 12 },
   chip: { paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs + 2, borderRadius: radius.sm, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   chipA: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipT: { color: colors.textMuted, fontSize: 12 },
   chipTA: { color: "#fff" },
-  status: { color: colors.star, fontSize: 13, fontWeight: "700", marginTop: spacing.xs },
-  label: { color: colors.textMuted, fontSize: 12, marginTop: spacing.sm, marginBottom: spacing.xs },
-  dateGrid: { marginVertical: spacing.sm },
-  dChip: { padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border, marginRight: spacing.xs },
-  dChipA: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dChipT: { color: colors.textMuted, fontSize: 11 },
-  dChipTA: { color: "#fff" },
-  fBtn: { padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm },
   modalO: { flex: 1, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)", padding: spacing.lg },
-  modalB: { backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg },
-  modalI: { padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalB: { backgroundColor: colors.card, borderRadius: radius.lg, paddingVertical: spacing.sm },
+  modalI: { paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   modalIA: { backgroundColor: colors.cardAlt },
-  modalIT: { color: colors.text, fontSize: 14 },
+  modalIT: { color: colors.text, fontSize: 15 },
   modalITA: { color: colors.primary, fontWeight: "700" },
 });
