@@ -5,6 +5,9 @@ export interface UserProfile {
   name: string;
   email: string;
   role: string;
+  hasPassword?: boolean;
+  googleLinked?: boolean;
+  avatarUrl?: string | null;
 }
 
 export interface Checkin {
@@ -59,8 +62,9 @@ export async function updateMe(name: string): Promise<UserProfile> {
   return data;
 }
 
-export async function deleteAccount(password: string): Promise<void> {
-  await apiClient.delete("/users/me", { data: { password } });
+/** Password accounts confirm with their password; Google-only accounts confirm by typing DELETE. */
+export async function deleteAccount(confirm: { password?: string; confirmText?: string }): Promise<void> {
+  await apiClient.delete("/users/me", { data: confirm });
 }
 
 export async function getCheckins(): Promise<Checkin[]> {

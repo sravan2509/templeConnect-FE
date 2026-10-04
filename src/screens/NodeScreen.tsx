@@ -116,7 +116,7 @@ export default function NodeScreen({ route, navigation }: any) {
 
       {node.id === "profile-root" && (
         <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
-          <Button title="Change Password" variant="secondary" onPress={() => navigation.navigate("ChangePassword")} />
+          <Button title={user?.hasPassword === false ? "Set a Password" : "Change Password"} variant="secondary" onPress={() => navigation.navigate("ChangePassword")} />
           <Button title="Log Out" variant="secondary" onPress={() => Alert.alert("Log out?", "You'll need to sign in again to use the app.", [{ text: "Cancel", style: "cancel" }, { text: "Log Out", style: "destructive", onPress: signOut }])} />
         </View>
       )}
@@ -213,6 +213,7 @@ function AccountSection({ user, updateSession, signOut }: { user: any; updateSes
   const [showDelete, setShowDelete] = useState(false);
   const [password, setPassword] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const googleOnly = user?.hasPassword === false;
 
   async function saveName() {
     if (!name.trim()) return Alert.alert("Name required", "Please enter your name.");
@@ -226,12 +227,14 @@ function AccountSection({ user, updateSession, signOut }: { user: any; updateSes
   }
 
   function confirmDelete() {
-    if (!password) return Alert.alert("Password required", "Enter your password to confirm.");
+    if (googleOnly ? password.trim().toUpperCase() !== "DELETE" : !password) {
+      return Alert.alert("Confirmation required", googleOnly ? "Type DELETE to confirm." : "Enter your password to confirm.");
+    }
     Alert.alert("Delete account permanently?", "Your bookings, birth chart, saved temples and messages will be deleted. This cannot be undone.", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
         setDeleting(true);
-        try { await deleteAccount(password); await signOut(); }
+        try { await deleteAccount(googleOnly ? { confirmText: password } : { password }); await signOut(); }
         catch (e) { Alert.alert("Could not delete account", getErrorMessage(e)); }
         finally { setDeleting(false); }
       } },
@@ -243,6 +246,7 @@ function AccountSection({ user, updateSession, signOut }: { user: any; updateSes
       <Card>
         <TextField label="Name" value={name} onChangeText={setName} />
         <Text style={styles.sub}>Email: {user?.email}</Text>
+        {user?.googleLinked ? <Text style={styles.sub}>Signed in with Google ✓</Text> : null}
         <Button title="Save" onPress={saveName} loading={saving} disabled={name.trim() === user?.name} style={{ marginTop: spacing.md }} />
       </Card>
       <Card style={{ borderColor: colors.danger }}>
@@ -251,7 +255,13 @@ function AccountSection({ user, updateSession, signOut }: { user: any; updateSes
           <Button title="Delete My Account" variant="secondary" onPress={() => setShowDelete(true)} style={{ marginTop: spacing.sm, borderColor: colors.danger }} />
         ) : (
           <>
-            <TextField label="Confirm with your password" value={password} onChangeText={setPassword} secureTextEntry />
+            <TextField
+              label={googleOnly ? 'Type DELETE to confirm' : "Confirm with your password"}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!googleOnly}
+              autoCapitalize={googleOnly ? "characters" : "none"}
+            />
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
               <Button title="Cancel" variant="secondary" onPress={() => { setShowDelete(false); setPassword(""); }} style={{ flex: 1 }} />
               <Button title="Delete" onPress={confirmDelete} loading={deleting} style={{ flex: 1, backgroundColor: colors.danger }} />

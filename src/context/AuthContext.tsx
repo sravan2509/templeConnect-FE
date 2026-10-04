@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AuthUser, login as loginApi, register as registerApi } from "../api/auth";
+import { AuthUser, googleSignIn as googleSignInApi, login as loginApi, register as registerApi } from "../api/auth";
+import { getGoogleIdToken, signOutGoogle } from "../utils/googleSignIn";
 import { setForceLogout } from "../api/client";
 import { clearToken, getToken, setToken } from "../utils/tokenStorage";
 import { getMe } from "../api/profile";
@@ -20,6 +21,8 @@ interface AuthContextValue {
   isPriest: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
+  /** Opens the Google account picker; signs in or creates the account. Throws GoogleSignInCancelled if dismissed. */
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   /** Stores a new token/user (e.g. after a password change) or updates the cached profile. */
   updateSession: (user: AuthUserWithRole, token?: string) => Promise<void>;
@@ -73,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try { await clearPushToken(); } catch {}
     }
     await forgetPushRegistration();
+    await signOutGoogle();
     await clearLocal();
   });
 
@@ -88,6 +92,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       signUp: async (name, email, password) => {
         const res = await registerApi(name.trim(), email.trim(), password);
+        await persist(res.token, res.user);
+      },
+      signInWithGoogle: async () => {
+        const idToken = await getGoogleIdToken();
+        const res = await googleSignInApi(idToken);
         await persist(res.token, res.user);
       },
       signOut: async () => {

@@ -5,6 +5,10 @@ export interface AuthUser {
   name: string;
   email: string;
   role?: string;
+  /** False for accounts created with Google that haven't set a password. */
+  hasPassword?: boolean;
+  googleLinked?: boolean;
+  avatarUrl?: string | null;
 }
 
 export interface AuthResponse {
@@ -14,6 +18,12 @@ export interface AuthResponse {
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const { data } = await apiClient.post("/auth/login", { email, password });
+  return data;
+}
+
+/** Exchanges a Google ID token for a Temple Connect session (signs in or creates the account). */
+export async function googleSignIn(idToken: string): Promise<AuthResponse & { isNewUser: boolean }> {
+  const { data } = await apiClient.post("/auth/google", { idToken });
   return data;
 }
 
@@ -33,8 +43,11 @@ export async function resetPassword(email: string, token: string, newPassword: s
   return data;
 }
 
-/** Other sessions are signed out; the returned token replaces this device's token. */
-export async function changePassword(oldPassword: string, newPassword: string): Promise<{ message: string } & AuthResponse> {
+/**
+ * Other sessions are signed out; the returned token replaces this device's token.
+ * `oldPassword` may be omitted when a Google-only account sets its first password.
+ */
+export async function changePassword(oldPassword: string | undefined, newPassword: string): Promise<{ message: string } & AuthResponse> {
   const { data } = await apiClient.post("/auth/change-password", { oldPassword, newPassword });
   return data;
 }

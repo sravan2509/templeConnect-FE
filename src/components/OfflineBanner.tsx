@@ -9,6 +9,8 @@ import { colors, spacing } from "../theme";
  * App-wide banner shown above the tab bar on every screen while the device has no internet.
  * Briefly confirms when the connection comes back.
  */
+const OFFLINE_DELAY_MS = 1500;
+
 export function OfflineBanner() {
   const insets = useSafeAreaInsets();
   const [offline, setOffline] = useState(false);
@@ -18,16 +20,30 @@ export function OfflineBanner() {
 
   useEffect(() => {
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
+    let offlineTimer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const online = isOnline(state);
-      setOffline(!online);
-      if (online && wasOffline.current) {
-        setJustReconnected(true);
-        hideTimer = setTimeout(() => setJustReconnected(false), 2500);
+      if (isOnline(state)) {
+        if (offlineTimer) { clearTimeout(offlineTimer); offlineTimer = undefined; }
+        setOffline(false);
+        if (wasOffline.current) {
+          setJustReconnected(true);
+          hideTimer = setTimeout(() => setJustReconnected(false), 2500);
+        }
+        wasOffline.current = false;
+      } else if (!offlineTimer && !wasOffline.current) {
+        // Only treat it as offline if it lasts — ignores startup "unknown" states and brief blips.
+        offlineTimer = setTimeout(() => {
+          offlineTimer = undefined;
+          wasOffline.current = true;
+          setOffline(true);
+        }, OFFLINE_DELAY_MS);
       }
-      wasOffline.current = !online;
     });
-    return () => { unsubscribe(); if (hideTimer) clearTimeout(hideTimer); };
+    return () => {
+      unsubscribe();
+      if (hideTimer) clearTimeout(hideTimer);
+      if (offlineTimer) clearTimeout(offlineTimer);
+    };
   }, []);
 
   const visible = offline || justReconnected;

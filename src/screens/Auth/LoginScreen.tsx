@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { colors, spacing } from "../../theme";
 import { getErrorMessage, isNetworkError } from "../../api/client";
 import { isProbablyOnline } from "../../utils/network";
+import { GoogleButton } from "../../components/GoogleButton";
 import { isValidEmail } from "../../api/auth";
 
 export function showAuthError(title: string, err: unknown) {
@@ -52,6 +53,7 @@ export default function LoginScreen({ navigation, route }: any) {
       <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" placeholder="you@example.com" />
       <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" placeholder="Your password" onSubmitEditing={handleLogin} returnKeyType="go" />
       <Button title="Log In" onPress={handleLogin} loading={loading} style={{ marginTop: spacing.sm }} />
+      <GoogleButton disabled={loading} />
       <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword", { email })} style={styles.link}>
         <Text style={styles.linkText}>Forgot Password?</Text>
       </TouchableOpacity>

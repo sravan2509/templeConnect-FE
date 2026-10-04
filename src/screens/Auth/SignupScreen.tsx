@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { colors, spacing } from "../../theme";
 import { isValidEmail } from "../../api/auth";
 import { showAuthError } from "./LoginScreen";
+import { GoogleButton } from "../../components/GoogleButton";
 
 export default function SignupScreen({ navigation }: any) {
   const { signUp } = useAuth();
@@ -51,6 +52,7 @@ export default function SignupScreen({ navigation }: any) {
       <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" placeholder="At least 8 characters" />
       <TextField label="Confirm Password" value={confirm} onChangeText={setConfirm} secureTextEntry autoComplete="new-password" placeholder="Re-enter password" onSubmitEditing={handleSignup} returnKeyType="go" />
       <Button title="Sign Up" onPress={handleSignup} loading={loading} style={{ marginTop: spacing.sm }} />
+      <GoogleButton disabled={loading} />
       <TouchableOpacity onPress={() => navigation.navigate("Login")} style={styles.link}>
         <Text style={styles.linkText}>Already have an account? Log in</Text>
       </TouchableOpacity>
